@@ -80,20 +80,38 @@ Manwhanted
 - Open your browser and go to `http://localhost:3000` to access the application.
 - Explore the features and enjoy reading manga!
 
-## Vercel Deployment
+## Vercel Deployment (Client Fix Applied)
 
-1. **Create Separate Projects** (recommended for monorepo):
-   - Client: Vercel Dashboard → New Project → Import repo → Root Directory: `client`
-   - Server: New Project → Root Directory: `server`
+### Client Project Configuration
+1. **Vercel Dashboard Settings**:
+   | Setting          | Value            |
+   |------------------|------------------|
+   | Root Directory  | `client`        |
+   | Build Command   | `npm run build` |
+   | Output Directory| `dist`          |
+   | Install Command | `npm install`   |
 
-2. **Environment Variables** (Server project):
-   - `MONGO_URI`: MongoDB connection string
-   - `JWT_SECRET`: Secure random string (e.g., `openssl rand -base64 32`)
+2. **Environment Variables** (Client project):
+   | Name       | Value                                      |
+   |------------|--------------------------------------------|
+   | `VITE_API_URL` | `https://your-manwhanted-server.vercel.app/api` (replace with server URL) |
 
-3. **Root vercel.json** (optional for combined client deploy with API proxy):
-   - Update `rewrites` destination to your server URL (e.g., `https://manwhanted-server-abc.vercel.app/api/$1`)
+3. **Files Updated**:
+   - `client/package.json`: Added TypeScript deps + `"type": "module"`.
+   - `client/tsconfig.json`: `target: "ES2020"`, `moduleResolution: "bundler"`.
+   - `client/.env.example`: VITE_API_URL template.
+   - `client/vercel.json`: Already correct (static-build, distDir).
 
-4. Deploy and test!
+### Server Project
+- Root Directory: `server`
+- Env Vars: `MONGO_URI`, `JWT_SECRET`
+
+4. **Usage**:
+   - Copy `client/.env.example` → `.env` locally (Vite loads as `import.meta.env.VITE_API_URL`).
+   - Push commits → auto-redeploy.
+   - Test API: Client should use VITE_API_URL (not localhost).
+
+**Root vercel.json** remains for monorepo proxy if deploying combined.
 
 ## Contributing
 

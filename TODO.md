@@ -1,10 +1,9 @@
-# Vercel Deployment Fix Steps
-
-- [x] Update root vercel.json for client build + API proxy
-- [x] Create client/vercel.json
-- [x] Create server/vercel.json
-- [x] Update README.md with instructions
-- [x] Fix client/server package.json (react-scripts, types)
-- [x] Fix server index.ts (placeholder API)
-- [ ] User: Git push, redeploy Vercel projects
-- [ ] User: Set server env vars (MONGO_URI, JWT_SECRET)
+# Vercel Client Deployment Fix
+- [x] 1. Plan approved by user
+- [x] 2. Update client/package.json (add TS deps, type:module)
+- [x] 3. Update client/tsconfig.json (target ES2020)
+- [x] 4. Create client/.env.example (VITE_API_URL)
+- [x] 5. Update README.md (add Vercel instructions)
+- [ ] 6. Local test: cd client && npm i && npm run build
+- [ ] 7. Commit/push & Vercel redeploy (set root=client, add VITE_API_URL)
+- [ ] 8. Verify deployment & API calls
