@@ -1,12 +1,12 @@
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { BookmarkProvider } from './context/BookmarkContext';
-import Navbar from './components/Navbar';
-import Home from './pages/Home';
-import Browse from './pages/Browse';
-import Announcements from './pages/Announcements';
-import SeriesDetail from './pages/SeriesDetail';
-import ChapterReader from './pages/ChapterReader';
+import Navbar from './components/Navbar.jsx';
+import Home from './pages/Home.jsx';
+import Browse from './pages/Browse.jsx';
+import Announcements from './pages/Announcements.jsx';
+import SeriesDetail from './pages/SeriesDetail.jsx';
+import ChapterReader from './pages/ChapterReader.jsx';
 
 export default function App() {
   return (
