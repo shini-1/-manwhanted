@@ -1,7 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { BookmarkProvider } from './context/BookmarkContext';
-import Navbar from './components/Navbar';
+import Navbar from './Navbar';
 import Home from './pages/Home';
 import Browse from './pages/Browse';
 import Announcements from './pages/Announcements';
