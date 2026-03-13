@@ -1,19 +1,17 @@
 {
-  "version": 2,
-  "projects": [
+  "builds": [
     {
-      "name": "manwhanted-client",
-      "root": "client",
-      "installCommand": "npm ci",
-      "buildCommand": "npm run build",
-      "outputDirectory": "build"
-    },
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "client/build"
+      }
+    }
+  ],
+  "rewrites": [
     {
-      "name": "manwhanted-server",
-      "root": "server",
-      "installCommand": "npm ci",
-      "buildCommand": "npm run build",
-      "startCommand": "npm run start"
+      "source": "/api/(.*)",
+      "destination": "https://manwhanted-server.vercel.app/api/$1"
     }
   ]
 }

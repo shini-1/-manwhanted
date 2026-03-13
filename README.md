@@ -80,6 +80,21 @@ Manwhanted
 - Open your browser and go to `http://localhost:3000` to access the application.
 - Explore the features and enjoy reading manga!
 
+## Vercel Deployment
+
+1. **Create Separate Projects** (recommended for monorepo):
+   - Client: Vercel Dashboard → New Project → Import repo → Root Directory: `client`
+   - Server: New Project → Root Directory: `server`
+
+2. **Environment Variables** (Server project):
+   - `MONGO_URI`: MongoDB connection string
+   - `JWT_SECRET`: Secure random string (e.g., `openssl rand -base64 32`)
+
+3. **Root vercel.json** (optional for combined client deploy with API proxy):
+   - Update `rewrites` destination to your server URL (e.g., `https://manwhanted-server-abc.vercel.app/api/$1`)
+
+4. Deploy and test!
+
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request for any enhancements or bug fixes.
