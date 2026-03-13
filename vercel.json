@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "projects": [
+    {
+      "name": "manwhanted-client",
+      "root": "client",
+      "installCommand": "npm ci",
+      "buildCommand": "npm run build",
+      "outputDirectory": "build"
+    },
+    {
+      "name": "manwhanted-server",
+      "root": "server",
+      "installCommand": "npm ci",
+      "buildCommand": "npm run build",
+      "startCommand": "npm run start"
+    }
+  ]
+}
