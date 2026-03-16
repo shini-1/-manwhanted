@@ -19,7 +19,13 @@ const Browse = () => {
       setError(null);
       try {
         const res = await api.get('/series');
-        setSeries(res.data);
+        if (Array.isArray(res.data)) {
+          setSeries(res.data);
+        } else {
+          console.warn('Expected series list to be an array, got:', res.data);
+          setSeries([]);
+          setError('Unexpected series response format.');
+        }
       } catch (err) {
         setError(err?.response?.data?.message || 'Failed to load series.');
       } finally {
