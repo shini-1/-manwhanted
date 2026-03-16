@@ -1,31 +1,109 @@
-import React from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useEffect, useState, useContext } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import api from '../api';
+import { BookmarkContext } from '../context/BookmarkContext';
+import LoadingSpinner from '../LoadingSpinner';
+import ErrorAlert from '../ErrorAlert';
 
 const SeriesDetail = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { bookmarks, addBookmark, removeBookmark } = useContext(BookmarkContext);
+  const [series, setSeries] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const isBookmarked = () => bookmarks.includes(id);
+
+  const handleBookmarkToggle = async () => {
+    if (!id) return;
+
+    try {
+      if (isBookmarked()) {
+        await removeBookmark(id);
+      } else {
+        await addBookmark(id);
+      }
+    } catch (err) {
+      if (err?.response?.status === 401) {
+        navigate('/login');
+      }
+    }
+  };
+
+  useEffect(() => {
+    const loadSeries = async () => {
+      if (!id) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await api.get(`/series/${id}`);
+        setSeries(res.data);
+      } catch (err) {
+        if (err?.response?.status === 401) {
+          navigate('/login');
+          return;
+        }
+        setError(err?.response?.data?.message || 'Failed to load series.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSeries();
+  }, [id, navigate]);
+
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorAlert message={error} />;
+  if (!series) return null;
+
   return (
     <div className="container mx-auto p-8">
-      <div className="aspect-video bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg mb-8 flex items-center justify-center">
-        <span className="text-white text-3xl font-bold">Series #{id}</span>
-      </div>
-      <h1 className="text-4xl font-bold mb-6">Series Title</h1>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
-          <h2 className="text-2xl font-semibold mb-4">Details</h2>
-          <p className="text-lg mb-4">Genre: Action, Fantasy</p>
-          <p className="text-lg mb-4">Status: Ongoing</p>
-          <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-            Add to Bookmarks
+          <img
+            src={series.coverImage || 'https://via.placeholder.com/500x750'}
+            alt={series.title}
+            className="w-full rounded-lg shadow-lg mb-6"
+          />
+          <h1 className="text-4xl font-bold mb-4">{series.title}</h1>
+          <p className="text-lg mb-2">{series.description || 'No description available.'}</p>
+          <p className="text-sm text-gray-500 mb-2">
+            Genres: {series.genres?.join(', ') || 'N/A'}
+          </p>
+          <p className="text-sm text-gray-500 mb-6">Status: {series.status || 'Unknown'}</p>
+          <button
+            className={`w-full py-2 rounded-lg text-white ${isBookmarked() ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+            onClick={handleBookmarkToggle}
+          >
+            {isBookmarked() ? 'Remove Bookmark' : 'Add to Bookmarks'}
           </button>
         </div>
         <div className="lg:col-span-2">
           <h2 className="text-2xl font-semibold mb-4">Chapters</h2>
-          <div className="space-y-2">
-            <div className="flex justify-between p-4 bg-gray-50 rounded-lg">
-              <span>Chapter 1</span>
-              <button className="text-blue-600 hover:underline">Read</button>
+          {series.chapters && series.chapters.length > 0 ? (
+            <div className="space-y-2">
+              {series.chapters.map((chapter) => (
+                <div
+                  key={chapter._id}
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                >
+                  <div>
+                    <p className="font-semibold">{chapter.title}</p>
+                    <p className="text-sm text-gray-500">Chapter {chapter.number}</p>
+                  </div>
+                  <Link
+                    to={`/read/${chapter._id}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Read
+                  </Link>
+                </div>
+              ))}
             </div>
-          </div>
+          ) : (
+            <p className="text-gray-500">No chapters available yet.</p>
+          )}
         </div>
       </div>
     </div>

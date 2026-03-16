@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import axios from 'axios';
+import api from '../api';
 import { AuthContext } from './AuthContext';
 
 export const BookmarkContext = createContext();
@@ -9,18 +9,31 @@ export const BookmarkProvider = ({ children }) => {
   const [bookmarks, setBookmarks] = useState([]);
 
   useEffect(() => {
-    if (user) {
-      axios.get('/api/users/bookmarks').then(res => setBookmarks(res.data));
-    }
+    const loadBookmarks = async () => {
+      if (!user) {
+        setBookmarks([]);
+        return;
+      }
+
+      try {
+        const res = await api.get('/users/bookmarks');
+        setBookmarks(res.data);
+      } catch (err) {
+        console.error('Unable to load bookmarks', err);
+        setBookmarks([]);
+      }
+    };
+
+    loadBookmarks();
   }, [user]);
 
   const addBookmark = async (seriesId) => {
-    await axios.post(`/api/users/bookmarks/${seriesId}`);
+    await api.post(`/users/bookmarks/${seriesId}`);
     setBookmarks([...bookmarks, seriesId]);
   };
 
   const removeBookmark = async (seriesId) => {
-    await axios.delete(`/api/users/bookmarks/${seriesId}`);
+    await api.delete(`/users/bookmarks/${seriesId}`);
     setBookmarks(bookmarks.filter(id => id !== seriesId));
   };
 

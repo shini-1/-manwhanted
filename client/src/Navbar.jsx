@@ -9,16 +9,27 @@ export default function Navbar() {
   return (
     <nav className="bg-gray-800 p-4 flex justify-between items-center">
       <Link to="/" className="text-xl font-bold">Manwhanted</Link>
-      <div className="flex space-x-4">
+      <div className="flex space-x-4 items-center">
         <Link to="/">Home</Link>
         <Link to="/browse">Browse</Link>
         <Link to="/announcements">Announcements</Link>
         {user ? (
           <>
-            <Link to="/bookmarks"><FaBookmark /></Link>
-            <button onClick={logout}><FaUser /></button>
+            <Link to="/bookmarks" className="flex items-center gap-1">
+              <FaBookmark />
+              <span className="hidden sm:inline">Bookmarks</span>
+            </Link>
+            <button onClick={logout} className="flex items-center gap-1">
+              <FaUser />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
           </>
-        ) : null}
+        ) : (
+          <>
+            <Link to="/login">Login</Link>
+            <Link to="/register">Register</Link>
+          </>
+        )}
       </div>
     </nav>
   );

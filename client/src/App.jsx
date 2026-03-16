@@ -7,6 +7,9 @@ import Browse from './pages/Browse';
 import Announcements from './pages/Announcements';
 import SeriesDetail from './pages/SeriesDetail';
 import ChapterReader from './pages/ChapterReader';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Bookmarks from './pages/Bookmarks';
 
 export default function App() {
   return (
@@ -21,6 +24,9 @@ export default function App() {
               <Route path="/announcements" element={<Announcements />} />
               <Route path="/series/:id" element={<SeriesDetail />} />
               <Route path="/read/:id" element={<ChapterReader />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/bookmarks" element={<Bookmarks />} />
             </Routes>
           </main>
           <footer className="bg-gray-800 p-4 text-center">© 2026 Manwhanted</footer>
