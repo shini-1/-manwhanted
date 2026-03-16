@@ -29,6 +29,18 @@ const ChapterReader = () => {
         const chapterIds = (seriesRes.data.chapters || []).map((c) => c._id);
         const idx = chapterIds.findIndex((cId) => cId === id);
         setChapterIndex(idx);
+
+        // Persist last-read chapter per series (local cache)
+        if (res.data.series) {
+          localStorage.setItem(`manwhanted:lastRead:${res.data.series}`, id);
+
+          // Also persist for logged in users (server-side history)
+          try {
+            await api.post(`/users/history/${res.data.series}`, { chapterId: id });
+          } catch (e) {
+            // ignore, optional tracking
+          }
+        }
       } catch (err) {
         if (err?.response?.status === 401) {
           navigate('/login');
@@ -47,9 +59,9 @@ const ChapterReader = () => {
   if (error) return <ErrorAlert message={error} />;
   if (!chapter) return null;
 
-  const prevChapterId = chapterIndex > 0 ? series?.chapters[chapterIndex - 1]._id : null;
+  const prevChapterId = chapterIndex > 0 ? series?.chapters?.[chapterIndex - 1]?._id : null;
   const nextChapterId = chapterIndex >= 0 && series?.chapters?.length
-    ? series.chapters[chapterIndex + 1]?._id
+    ? series.chapters?.[chapterIndex + 1]?._id
     : null;
 
   return (
@@ -86,7 +98,7 @@ const ChapterReader = () => {
         </div>
       </div>
       <div className="space-y-6">
-        {chapter.pages && chapter.pages.length > 0 ? (
+        {Array.isArray(chapter.pages) && chapter.pages.length > 0 ? (
           chapter.pages.map((pageUrl, index) => (
             <div key={index} className="bg-white shadow-lg rounded-lg p-4">
               <img

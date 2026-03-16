@@ -10,6 +10,8 @@ import ErrorAlert from '../ErrorAlert';
 const Bookmarks = () => {
   const { user } = useContext(AuthContext);
   const { bookmarks } = useContext(BookmarkContext);
+
+  const isBookmarkedArray = Array.isArray(bookmarks);
   const [series, setSeries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -23,7 +25,7 @@ const Bookmarks = () => {
   }, [user, navigate]);
 
   useEffect(() => {
-    if (!bookmarks) {
+if (!bookmarks || !isBookmarkedArray) {
       return;
     }
 
@@ -62,7 +64,7 @@ const Bookmarks = () => {
         <p className="text-gray-600">You haven't bookmarked any series yet.</p>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {series.map((item) => (
+        {Array.isArray(series) && series.map((item) => (
           <SeriesCard key={item._id} series={item} />
         ))}
       </div>

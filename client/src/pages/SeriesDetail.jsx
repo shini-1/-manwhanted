@@ -10,10 +10,11 @@ const SeriesDetail = () => {
   const navigate = useNavigate();
   const { bookmarks, addBookmark, removeBookmark } = useContext(BookmarkContext);
   const [series, setSeries] = useState(null);
+  const [resumeChapterId, setResumeChapterId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const isBookmarked = () => bookmarks.includes(id);
+  const isBookmarked = () => Array.isArray(bookmarks) && bookmarks.includes(id);
 
   const handleBookmarkToggle = async () => {
     if (!id) return;
@@ -39,6 +40,20 @@ const SeriesDetail = () => {
       try {
         const res = await api.get(`/series/${id}`);
         setSeries(res.data);
+
+        const savedChapter = localStorage.getItem(`manwhanted:lastRead:${id}`);
+        if (savedChapter) {
+          setResumeChapterId(savedChapter);
+        }
+
+        try {
+          const resHistory = await api.get(`/users/history/${id}`);
+          if (resHistory?.data?.chapterId) {
+            setResumeChapterId(resHistory.data.chapterId);
+          }
+        } catch (err) {
+          // ignore; this is optional
+        }
       } catch (err) {
         if (err?.response?.status === 401) {
           navigate('/login');
@@ -72,16 +87,27 @@ const SeriesDetail = () => {
             Genres: {series.genres?.join(', ') || 'N/A'}
           </p>
           <p className="text-sm text-gray-500 mb-6">Status: {series.status || 'Unknown'}</p>
-          <button
-            className={`w-full py-2 rounded-lg text-white ${isBookmarked() ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-            onClick={handleBookmarkToggle}
-          >
-            {isBookmarked() ? 'Remove Bookmark' : 'Add to Bookmarks'}
-          </button>
+          <div className="space-y-3">
+            <button
+              className={`w-full py-2 rounded-lg text-white ${isBookmarked() ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+              onClick={handleBookmarkToggle}
+            >
+              {isBookmarked() ? 'Remove Bookmark' : 'Add to Bookmarks'}
+            </button>
+
+            {resumeChapterId && (
+              <button
+                className="w-full py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                onClick={() => navigate(`/read/${resumeChapterId}`)}
+              >
+                Resume Reading
+              </button>
+            )}
+          </div>
         </div>
         <div className="lg:col-span-2">
           <h2 className="text-2xl font-semibold mb-4">Chapters</h2>
-          {series.chapters && series.chapters.length > 0 ? (
+          {Array.isArray(series.chapters) && series.chapters.length > 0 ? (
             <div className="space-y-2">
               {series.chapters.map((chapter) => (
                 <div

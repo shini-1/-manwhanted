@@ -1,6 +1,6 @@
 import express from 'express';
 import { register, login, me } from './controllers/authController';
-import { getBookmarks, addBookmark, removeBookmark } from './controllers/userController';
+import { getBookmarks, addBookmark, removeBookmark, getReadingHistory, setReadingHistory } from './controllers/userController';
 import {
   listSeries,
   getSeriesById,
@@ -8,6 +8,7 @@ import {
   getChapterById,
 } from './controllers/seriesController';
 import { authMiddleware } from './middleware/auth';
+import { logError } from './controllers/logController';
 
 const router = express.Router();
 
@@ -15,6 +16,9 @@ const router = express.Router();
 router.get('/', (req, res) => {
   res.json({ message: 'Server is running' });
 });
+
+// Client-side logging
+router.post('/logs', logError);
 
 // Authentication
 router.post('/auth/register', register);
@@ -25,6 +29,10 @@ router.get('/auth/me', authMiddleware, me);
 router.get('/users/bookmarks', authMiddleware, getBookmarks);
 router.post('/users/bookmarks/:seriesId', authMiddleware, addBookmark);
 router.delete('/users/bookmarks/:seriesId', authMiddleware, removeBookmark);
+
+// Reading history
+router.get('/users/history/:seriesId', authMiddleware, getReadingHistory);
+router.post('/users/history/:seriesId', authMiddleware, setReadingHistory);
 
 // Series / chapters
 router.get('/series', listSeries);

@@ -72,7 +72,7 @@ const Browse = () => {
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {paged.map((item) => (
+                {Array.isArray(paged) && paged.map((item) => (
                   <SeriesCard key={item._id} series={item} />
                 ))}
               </div>
