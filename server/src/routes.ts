@@ -9,6 +9,8 @@ import {
 } from './controllers/seriesController';
 import { authMiddleware } from './middleware/auth';
 import { logError } from './controllers/logController';
+import { importPopular } from './controllers/mangadex.controller';
+
 
 const router = express.Router();
 
@@ -33,6 +35,9 @@ router.delete('/users/bookmarks/:seriesId', authMiddleware, removeBookmark);
 // Reading history
 router.get('/users/history/:seriesId', authMiddleware, getReadingHistory);
 router.post('/users/history/:seriesId', authMiddleware, setReadingHistory);
+
+// MangaDex admin
+router.post('/admin/import-popular', importPopular);
 
 // Series / chapters
 router.get('/series', listSeries);

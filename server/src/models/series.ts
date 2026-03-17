@@ -7,6 +7,7 @@ export interface ISeries extends Document {
   genres: string[];
   status: string;
   chapters: mongoose.Types.ObjectId[];
+  externalId?: string;
 }
 
 const seriesSchema = new Schema<ISeries>(
@@ -17,6 +18,7 @@ const seriesSchema = new Schema<ISeries>(
     genres: [{ type: String }],
     status: { type: String, default: 'ongoing' },
     chapters: [{ type: Schema.Types.ObjectId, ref: 'Chapter' }],
+    externalId: { type: String, unique: true, sparse: true },
   },
   {
     timestamps: true,
