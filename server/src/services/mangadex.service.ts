@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { ISeries } from '../models/series';
+import process from 'node:process';
 
 const BASE_URL = process.env.MANGADEX_API_BASE || 'https://api.mangadex.org';
 
@@ -37,10 +38,10 @@ class MangaDexService {
   }
 
   private async delay(ms: number): Promise<void> {
-    return;
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  async getPopularManga(limit: number = 20): Promise<Partial<ISeries>>[] {
+  async getPopularManga(limit: number = 20): Promise<Partial<ISeries>[]> {
     try {
       const response = await this.api.get<{ data: MangaDexManga[] }>('/manga', {
         params: {
