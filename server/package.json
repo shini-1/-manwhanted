@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "Backend for Manwhanted manhwa reader app",
   "type": "module",
-  "main": "dist/src/index.js",
+"main": "dist/index.js"
   "scripts": {
-    "start": "node dist/src/index.js",
+"start": "node dist/index.js"
     "dev": "tsx watch src/index.ts",
     "build": "rimraf dist && tsc"
   },

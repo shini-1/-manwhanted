@@ -1,38 +1,33 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = __importDefault(require("express"));
-const authController_1 = require("./controllers/authController");
-const userController_1 = require("./controllers/userController");
-const seriesController_1 = require("./controllers/seriesController");
-const auth_1 = require("./middleware/auth");
-const logController_1 = require("./controllers/logController");
-const mangadex_controller_1 = require("./controllers/mangadex.controller");
-const router = express_1.default.Router();
+import express from 'express';
+import { register, login, me } from './controllers/authController.js';
+import { getBookmarks, addBookmark, removeBookmark, getReadingHistory, setReadingHistory } from './controllers/userController';
+import { listSeries, getSeriesById, getSeriesChapters, getChapterById, } from './controllers/seriesController';
+import { authMiddleware } from './middleware/auth';
+import { logError } from './controllers/logController';
+import { importPopular } from './controllers/mangadex.controller';
+const router = express.Router();
 // Health check
 router.get('/', (req, res) => {
     res.json({ message: 'Server is running' });
 });
 // Client-side logging
-router.post('/logs', logController_1.logError);
+router.post('/logs', logError);
 // Authentication
-router.post('/auth/register', authController_1.register);
-router.post('/auth/login', authController_1.login);
-router.get('/auth/me', auth_1.authMiddleware, authController_1.me);
+router.post('/auth/register', register);
+router.post('/auth/login', login);
+router.get('/auth/me', authMiddleware, me);
 // User actions
-router.get('/users/bookmarks', auth_1.authMiddleware, userController_1.getBookmarks);
-router.post('/users/bookmarks/:seriesId', auth_1.authMiddleware, userController_1.addBookmark);
-router.delete('/users/bookmarks/:seriesId', auth_1.authMiddleware, userController_1.removeBookmark);
+router.get('/users/bookmarks', authMiddleware, getBookmarks);
+router.post('/users/bookmarks/:seriesId', authMiddleware, addBookmark);
+router.delete('/users/bookmarks/:seriesId', authMiddleware, removeBookmark);
 // Reading history
-router.get('/users/history/:seriesId', auth_1.authMiddleware, userController_1.getReadingHistory);
-router.post('/users/history/:seriesId', auth_1.authMiddleware, userController_1.setReadingHistory);
+router.get('/users/history/:seriesId', authMiddleware, getReadingHistory);
+router.post('/users/history/:seriesId', authMiddleware, setReadingHistory);
 // MangaDex admin
-router.post('/admin/import-popular', mangadex_controller_1.importPopular);
+router.post('/admin/import-popular', importPopular);
 // Series / chapters
-router.get('/series', seriesController_1.listSeries);
-router.get('/series/:id', seriesController_1.getSeriesById);
-router.get('/series/:id/chapters', seriesController_1.getSeriesChapters);
-router.get('/chapters/:id', seriesController_1.getChapterById);
-exports.default = router;
+router.get('/series', listSeries);
+router.get('/series/:id', getSeriesById);
+router.get('/series/:id/chapters', getSeriesChapters);
+router.get('/chapters/:id', getChapterById);
+export default router;
