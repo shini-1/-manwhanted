@@ -1,6 +1,6 @@
-import Series from './models/series';
-import Chapter from './models/chapter';
-import User from './models/user';
+import Series from './models/series.js';
+import Chapter from './models/chapter.js';
+import User from './models/user.js';
 import bcrypt from 'bcryptjs';
 
 const DEFAULT_USER = {

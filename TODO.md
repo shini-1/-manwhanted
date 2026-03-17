@@ -7,4 +7,4 @@
 - [ ] 4. Deploy: cd server && vercel --prod.
 - [ ] 5. Verify deployed: Browser Network tab shows /api/series 200 + Access-Control-Allow-Origin header.
 
-## Status: Starting step 1
+## Status: Step 1 index.ts ✓ Step 3 ESM fixes applied (vercel.json, seed.ts). Run 'cd server &amp;&amp; npm run build &amp;&amp; vercel --prod' next.
