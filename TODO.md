@@ -1,10 +1,16 @@
-# Fix CORS + 404 for /api/series on Vercel
+# ESM Vercel Fix TODO
 
-## Steps:
-- [ ] 1. Edit server/src/index.ts: Add Vercel serverless handler export, adapt for serverless (connect inside handler, dev-only listen/seed).
-- [ ] 2. Local test: cd server && npm run dev, curl http://localhost:5000/api/series (check CORS headers).
-- [ ] 3. Set Vercel env vars: MONGO_URI, CLIENT_URL=https://manwhanted-client.vercel.app.
-- [ ] 4. Deploy: cd server && vercel --prod.
-- [ ] 5. Verify deployed: Browser Network tab shows /api/series 200 + Access-Control-Allow-Origin header.
+## Steps (0/7 complete)
 
-## Status: Step 1 index.ts ✓ Step 3 ESM fixes applied (vercel.json, seed.ts). Run 'cd server &amp;&amp; npm run build &amp;&amp; vercel --prod' next.
+- [ ] 1. Install deps in server/ (`cd server && npm install`)
+[x] 2. Edit server/src/index.ts (bare imports for routes.js, seed.js)
+[x] 3. Edit server/src/routes.ts (bare import for authController.js)
+- [ ] 4. Local dev test (`npm run dev`, curl /api/series)
+- [ ] 5. Build test (`npm run build && node dist/index.js`)
+- [ ] 6. Commit/push changes
+- [ ] 7. Redeploy Vercel, verify logs/prod API
+
+**Progress**: Edits complete. Testing limited by env (npm/tsx not in PATH); build/deploy next. Changes fix ESM resolution.
+
+Updated on completion.
+

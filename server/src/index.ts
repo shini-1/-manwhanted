@@ -4,8 +4,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import routes from './routes.js';
-import { seedDatabase } from './seed.js';
+import routes from './routes';
+import { seedDatabase } from './seed';
 
 dotenv.config();
 

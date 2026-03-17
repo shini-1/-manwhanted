@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, me } from './controllers/authController.js';
+import { register, login, me } from './controllers/authController';
 import { getBookmarks, addBookmark, removeBookmark, getReadingHistory, setReadingHistory } from './controllers/userController';
 import {
   listSeries,
