@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import routes from './routes';
-import { seedDatabase } from './seed';
+import { seedDatabase } from './seed.js';
 
 dotenv.config();
 
