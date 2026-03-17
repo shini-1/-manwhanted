@@ -4,7 +4,7 @@ export interface IUser extends Document {
   email: string;
   password: string;
   bookmarks: mongoose.Types.ObjectId[];
-  readingHistory: Array<{ series: mongoose.Types.ObjectId; chapter: mongoose.Types.ObjectId }>;
+  readingHistory: Array<{ series: mongoose.Types.ObjectId; chapter: mongoose.Types.ObjectId; updatedAt: Date; }>;
 }
 
 const userSchema = new Schema<IUser>(
