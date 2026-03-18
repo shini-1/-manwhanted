@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+  getSeriesFilters,
   listSeries,
   getSeriesById,
   getSeriesChapters,
@@ -24,6 +25,7 @@ router.post('/admin/import-popular', importPopular);
 
 // Series / chapters
 router.get('/series', listSeries);
+router.get('/series/filters', getSeriesFilters);
 router.get('/series/:id', getSeriesById);
 router.get('/series/:id/chapters', getSeriesChapters);
 router.get('/chapters/:id', getChapterById);

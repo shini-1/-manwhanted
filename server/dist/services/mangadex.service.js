@@ -5,6 +5,7 @@ const MANGADEX_SERIES_PREFIX = 'md_';
 const MANGADEX_CHAPTER_PREFIX = 'mdc_';
 class MangaDexService {
     api;
+    tagCache = null;
     constructor() {
         this.api = axios.create({
             baseURL: BASE_URL,
@@ -40,20 +41,7 @@ class MangaDexService {
         });
     }
     async getAllReadableChapters(externalId) {
-        const chapters = [];
-        const pageSize = 500;
-        let offset = 0;
-        let total = 0;
-        do {
-            const response = await this.getMangaFeedPage(externalId, pageSize, offset);
-            const pageItems = response.data.data || [];
-            total = response.data.total || pageItems.length;
-            chapters.push(...pageItems);
-            offset += pageItems.length;
-            if (pageItems.length === 0) {
-                break;
-            }
-        } while (offset < total);
+        const chapters = await this.getAllMangaChapters(externalId);
         const seen = new Set();
         return chapters
             .filter((chapter) => chapter.attributes.translatedLanguage === 'en')
@@ -69,6 +57,41 @@ class MangaDexService {
             _id: this.toChapterId(chapter.id),
             title: chapter.attributes.title || `Chapter ${chapter.attributes.chapter || '?'}`,
             number: chapter.attributes.chapter || '?',
+        }));
+    }
+    async getAllMangaChapters(externalId) {
+        const chapters = [];
+        const pageSize = 500;
+        let offset = 0;
+        let total = 0;
+        do {
+            const response = await this.getMangaFeedPage(externalId, pageSize, offset);
+            const pageItems = response.data.data || [];
+            total = response.data.total || pageItems.length;
+            chapters.push(...pageItems);
+            offset += pageItems.length;
+            if (pageItems.length === 0) {
+                break;
+            }
+        } while (offset < total);
+        return chapters;
+    }
+    mapChaptersForSeries(chapters) {
+        const seen = new Set();
+        return chapters
+            .filter((chapter) => chapter.attributes.translatedLanguage === 'en')
+            .filter((chapter) => {
+            const key = chapter.id;
+            if (seen.has(key))
+                return false;
+            seen.add(key);
+            return true;
+        })
+            .map((chapter) => ({
+            _id: this.toChapterId(chapter.id),
+            title: chapter.attributes.title || `Chapter ${chapter.attributes.chapter || '?'}`,
+            number: chapter.attributes.chapter || '?',
+            pages: chapter.attributes.pages,
         }));
     }
     isMangaDexSeriesId(id) {
@@ -110,8 +133,61 @@ class MangaDexService {
             coverImage,
             genres: genres.slice(0, 5),
             status: attributes.status || 'ongoing',
+            originalLanguage: attributes.originalLanguage || 'unknown',
+            publicationDemographic: attributes.publicationDemographic || '',
+            contentRating: attributes.contentRating || 'safe',
             source: 'mangadex',
         };
+    }
+    matchesOriginFilter(manga, origin) {
+        if (!origin || origin === 'all') {
+            return true;
+        }
+        const language = manga.attributes.originalLanguage || '';
+        if (origin === 'manga')
+            return language === 'ja';
+        if (origin === 'manhwa')
+            return language === 'ko';
+        if (origin === 'manhua')
+            return language === 'zh' || language === 'zh-hk';
+        if (origin === 'other')
+            return !['ja', 'ko', 'zh', 'zh-hk'].includes(language);
+        return true;
+    }
+    buildMangaListParams(limit, offset, extraParams, filters) {
+        const params = {
+            limit,
+            offset,
+            includes: ['cover_art'],
+            contentRating: filters.contentRating && filters.contentRating !== 'all'
+                ? [filters.contentRating]
+                : ['safe'],
+            availableTranslatedLanguage: ['en'],
+            ...extraParams,
+        };
+        if (!extraParams.title) {
+            const sortKey = filters.sort || 'followedCount';
+            params.order = { [sortKey]: 'desc' };
+        }
+        if (filters.status && filters.status !== 'all') {
+            params.status = [filters.status];
+        }
+        if (filters.demographic && filters.demographic !== 'all') {
+            params.publicationDemographic = [filters.demographic];
+        }
+        if (filters.includedTags?.length) {
+            params.includedTags = filters.includedTags;
+            params.includedTagsMode = 'AND';
+        }
+        if (filters.origin && ['manga', 'manhwa', 'manhua'].includes(filters.origin)) {
+            if (filters.origin === 'manga')
+                params.originalLanguage = ['ja'];
+            if (filters.origin === 'manhwa')
+                params.originalLanguage = ['ko'];
+            if (filters.origin === 'manhua')
+                params.originalLanguage = ['zh', 'zh-hk'];
+        }
+        return params;
     }
     async getPopularManga(limit = 20) {
         try {
@@ -162,7 +238,13 @@ class MangaDexService {
             throw new Error(`Failed to fetch popular manga: ${error.message}`);
         }
     }
-    async getPopularReadableManga(page = 1, limit = 12) {
+    async getPopularReadableManga(page = 1, limit = 12, filters = {}) {
+        return this.getReadableMangaListing({}, page, limit, filters);
+    }
+    async searchReadableManga(query, page = 1, limit = 12, filters = {}) {
+        return this.getReadableMangaListing({ title: query }, page, limit, filters);
+    }
+    async getReadableMangaListing(extraParams, page = 1, limit = 12, filters = {}) {
         const safePage = Math.max(page, 1);
         const safeLimit = Math.min(Math.max(limit, 1), 24);
         const batchSize = Math.min(Math.max(safeLimit * 3, 20), 100);
@@ -172,19 +254,14 @@ class MangaDexService {
         let rawTotal = Number.POSITIVE_INFINITY;
         while (readableSeries.length < skip + safeLimit + 1 && rawOffset < rawTotal) {
             const response = await this.api.get('/manga', {
-                params: {
-                    limit: batchSize,
-                    offset: rawOffset,
-                    includes: ['cover_art'],
-                    order: { followedCount: 'desc' },
-                    contentRating: ['safe'],
-                    availableTranslatedLanguage: ['en'],
-                },
+                params: this.buildMangaListParams(batchSize, rawOffset, extraParams, filters),
             });
             const mangaBatch = response.data.data || [];
             rawTotal = response.data.total || mangaBatch.length;
             rawOffset += mangaBatch.length;
-            const readableChecks = await Promise.all(mangaBatch.map(async (manga) => {
+            const readableChecks = await Promise.all(mangaBatch
+                .filter((manga) => this.matchesOriginFilter(manga, filters.origin))
+                .map(async (manga) => {
                 const feedResponse = await this.getMangaFeedPage(manga.id, 5, 0);
                 const hasReadableChapter = feedResponse.data.data.some((chapter) => chapter.attributes.translatedLanguage === 'en' && chapter.attributes.pages > 0);
                 return hasReadableChapter ? this.transformManga(manga) : null;
@@ -211,18 +288,67 @@ class MangaDexService {
             },
         };
     }
+    async getFilterOptions() {
+        if (!this.tagCache) {
+            const response = await this.api.get('/manga/tag');
+            this.tagCache = response.data.data
+                .map((tag) => ({
+                id: tag.id,
+                name: this.pickLocalizedValue(tag.attributes.name),
+                group: tag.attributes.group,
+            }))
+                .filter((tag) => ['genre', 'theme', 'format'].includes(tag.group))
+                .sort((a, b) => a.name.localeCompare(b.name));
+        }
+        return {
+            origins: [
+                { value: 'all', label: 'All' },
+                { value: 'manga', label: 'Manga' },
+                { value: 'manhwa', label: 'Manhwa' },
+                { value: 'manhua', label: 'Manhua' },
+                { value: 'other', label: 'Other' },
+            ],
+            statuses: [
+                { value: 'all', label: 'Any status' },
+                { value: 'ongoing', label: 'Ongoing' },
+                { value: 'completed', label: 'Completed' },
+                { value: 'hiatus', label: 'Hiatus' },
+                { value: 'cancelled', label: 'Cancelled' },
+            ],
+            demographics: [
+                { value: 'all', label: 'Any demographic' },
+                { value: 'shounen', label: 'Shounen' },
+                { value: 'shoujo', label: 'Shoujo' },
+                { value: 'seinen', label: 'Seinen' },
+                { value: 'josei', label: 'Josei' },
+            ],
+            contentRatings: [
+                { value: 'all', label: 'All ratings' },
+                { value: 'safe', label: 'Safe' },
+                { value: 'suggestive', label: 'Suggestive' },
+                { value: 'erotica', label: 'Erotica' },
+            ],
+            sorts: [
+                { value: 'followedCount', label: 'Popular' },
+                { value: 'rating', label: 'Top rated' },
+                { value: 'latestUploadedChapter', label: 'Latest updates' },
+                { value: 'year', label: 'Newest series' },
+            ],
+            tags: this.tagCache,
+        };
+    }
     async getReadableMangaById(seriesId) {
         const externalId = this.getExternalSeriesId(seriesId);
         const [mangaResponse, chapters] = await Promise.all([
             this.api.get(`/manga/${externalId}`, {
                 params: { includes: ['cover_art'] },
             }),
-            this.getAllReadableChapters(externalId),
+            this.getAllMangaChapters(externalId),
         ]);
         const series = this.transformManga(mangaResponse.data.data);
         return {
             ...series,
-            chapters,
+            chapters: this.mapChaptersForSeries(chapters),
         };
     }
     async getReadableChapterById(chapterId) {

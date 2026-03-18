@@ -11,16 +11,32 @@ import {
 } from '../services/fallbackCatalog.js';
 
 export const listSeries = async (req: Request, res: Response) => {
-  const { ids, source, limit, page } = req.query;
+  const { ids, source, limit, page, q, origin, status, demographic, contentRating, sort, includedTags } = req.query;
   const idList = typeof ids === 'string'
     ? ids.split(',').map(id => id.trim()).filter(Boolean)
     : undefined;
   const parsedLimit = typeof limit === 'string' ? Math.min(parseInt(limit, 10) || 12, 24) : 12;
   const parsedPage = typeof page === 'string' ? Math.max(parseInt(page, 10) || 1, 1) : 1;
+  const parsedIncludedTags = typeof includedTags === 'string'
+    ? includedTags.split(',').map((tag) => tag.trim()).filter(Boolean)
+    : undefined;
+  const filters = {
+    origin: typeof origin === 'string' ? origin : undefined,
+    status: typeof status === 'string' ? status : undefined,
+    demographic: typeof demographic === 'string' ? demographic : undefined,
+    contentRating: typeof contentRating === 'string' ? contentRating : undefined,
+    sort: typeof sort === 'string' ? sort : undefined,
+    includedTags: parsedIncludedTags,
+  };
 
   try {
     if (source === 'mangadex') {
-      return res.json(await mangadexService.getPopularReadableManga(parsedPage, parsedLimit));
+      const searchQuery = typeof q === 'string' ? q.trim() : '';
+      if (searchQuery) {
+        return res.json(await mangadexService.searchReadableManga(searchQuery, parsedPage, parsedLimit, filters));
+      }
+
+      return res.json(await mangadexService.getPopularReadableManga(parsedPage, parsedLimit, filters));
     }
 
     await ensureDatabaseConnection();
@@ -35,6 +51,28 @@ export const listSeries = async (req: Request, res: Response) => {
   } catch (err) {
     console.error('List series error:', err);
     return res.json(listFallbackSeries(idList));
+  }
+};
+
+export const getSeriesFilters = async (req: Request, res: Response) => {
+  const { source } = req.query;
+
+  if (source !== 'mangadex') {
+    return res.json({
+      origins: [],
+      statuses: [],
+      demographics: [],
+      contentRatings: [],
+      sorts: [],
+      tags: [],
+    });
+  }
+
+  try {
+    return res.json(await mangadexService.getFilterOptions());
+  } catch (err) {
+    console.error('Get series filters error:', err);
+    return res.status(500).json({ message: 'Failed to load filters.' });
   }
 };
 
