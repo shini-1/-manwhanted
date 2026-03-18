@@ -1,6 +1,6 @@
 import Series from '../models/series.js';
 import Chapter from '../models/chapter.js';
-import { ensureDatabaseConnection, isDatabaseUnavailableError } from '../services/database.js';
+import { ensureDatabaseConnection } from '../services/database.js';
 import { getFallbackChapterById, getFallbackSeriesById, getFallbackSeriesChapters, listFallbackSeries, } from '../services/fallbackCatalog.js';
 export const listSeries = async (req, res) => {
     const { ids } = req.query;
@@ -18,10 +18,7 @@ export const listSeries = async (req, res) => {
     }
     catch (err) {
         console.error('List series error:', err);
-        if (isDatabaseUnavailableError(err)) {
-            return res.json(listFallbackSeries(idList));
-        }
-        return res.status(500).json({ message: 'Server error' });
+        return res.json(listFallbackSeries(idList));
     }
 };
 export const getSeriesById = async (req, res) => {
@@ -40,14 +37,11 @@ export const getSeriesById = async (req, res) => {
     }
     catch (err) {
         console.error('Get series error:', err);
-        if (isDatabaseUnavailableError(err)) {
-            const fallbackSeries = getFallbackSeriesById(id);
-            if (!fallbackSeries) {
-                return res.status(404).json({ message: 'Series not found' });
-            }
-            return res.json(fallbackSeries);
+        const fallbackSeries = getFallbackSeriesById(id);
+        if (!fallbackSeries) {
+            return res.status(404).json({ message: 'Series not found' });
         }
-        return res.status(500).json({ message: 'Server error' });
+        return res.json(fallbackSeries);
     }
 };
 export const getSeriesChapters = async (req, res) => {
@@ -59,10 +53,7 @@ export const getSeriesChapters = async (req, res) => {
     }
     catch (err) {
         console.error('Get series chapters error:', err);
-        if (isDatabaseUnavailableError(err)) {
-            return res.json(getFallbackSeriesChapters(id));
-        }
-        return res.status(500).json({ message: 'Server error' });
+        return res.json(getFallbackSeriesChapters(id));
     }
 };
 export const getChapterById = async (req, res) => {
@@ -77,13 +68,10 @@ export const getChapterById = async (req, res) => {
     }
     catch (err) {
         console.error('Get chapter error:', err);
-        if (isDatabaseUnavailableError(err)) {
-            const fallbackChapter = getFallbackChapterById(id);
-            if (!fallbackChapter) {
-                return res.status(404).json({ message: 'Chapter not found' });
-            }
-            return res.json(fallbackChapter);
+        const fallbackChapter = getFallbackChapterById(id);
+        if (!fallbackChapter) {
+            return res.status(404).json({ message: 'Chapter not found' });
         }
-        return res.status(500).json({ message: 'Server error' });
+        return res.json(fallbackChapter);
     }
 };
