@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import SeriesCard from '../SeriesCard';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
+import { buildPathWithSearch, setStoredHomePath } from '../utils/navigationState';
 const MAX_VISIBLE_TAGS = 24;
+const HOME_PAGE_SIZE = 12;
 
 // Fallback sample series so the UI is usable even if the backend isn't reachable.
 const SAMPLE_SERIES = [
@@ -26,15 +28,27 @@ const SAMPLE_SERIES = [
   },
 ];
 
+const parsePageNumber = (value, fallback = 1) => {
+  const parsedValue = Number.parseInt(value || '', 10);
+  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
+};
+
+const parseIncludedTags = (value) =>
+  value
+    ? value.split(',').map((tag) => tag.trim()).filter(Boolean)
+    : [];
+
 const Home = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   // Use sample series as a fallback so the UI is usable even if the API is not available.
   const [featured, setFeatured] = useState(SAMPLE_SERIES);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => parsePageNumber(searchParams.get('page')));
+  const [pageInput, setPageInput] = useState(() => String(parsePageNumber(searchParams.get('page'))));
   const [hasNextPage, setHasNextPage] = useState(false);
-  const [search, setSearch] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [search, setSearch] = useState(() => searchParams.get('q') || '');
+  const [showFilters, setShowFilters] = useState(() => searchParams.get('filters') === '1');
   const [filterOptions, setFilterOptions] = useState({
     origins: [],
     statuses: [],
@@ -44,12 +58,12 @@ const Home = () => {
     tags: [],
   });
   const [filters, setFilters] = useState({
-    origin: 'all',
-    status: 'all',
-    demographic: 'all',
-    contentRating: 'all',
-    sort: 'followedCount',
-    includedTags: [],
+    origin: searchParams.get('origin') || 'all',
+    status: searchParams.get('status') || 'all',
+    demographic: searchParams.get('demographic') || 'all',
+    contentRating: searchParams.get('contentRating') || 'all',
+    sort: searchParams.get('sort') || 'followedCount',
+    includedTags: parseIncludedTags(searchParams.get('includedTags')),
   });
 
   useEffect(() => {
@@ -75,7 +89,7 @@ const Home = () => {
         const { data } = await api.get('/series', {
           params: {
             source: 'mangadex',
-            limit: 12,
+            limit: HOME_PAGE_SIZE,
             page,
             q: search.trim() || undefined,
             origin: filters.origin !== 'all' ? filters.origin : undefined,
@@ -109,6 +123,54 @@ const Home = () => {
 
     loadFeatured();
   }, [page, search, filters]);
+
+  useEffect(() => {
+    setPageInput(String(page));
+  }, [page]);
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams();
+
+    if (page > 1) {
+      nextParams.set('page', String(page));
+    }
+
+    if (search.trim()) {
+      nextParams.set('q', search.trim());
+    }
+
+    if (showFilters) {
+      nextParams.set('filters', '1');
+    }
+
+    if (filters.origin !== 'all') {
+      nextParams.set('origin', filters.origin);
+    }
+
+    if (filters.status !== 'all') {
+      nextParams.set('status', filters.status);
+    }
+
+    if (filters.demographic !== 'all') {
+      nextParams.set('demographic', filters.demographic);
+    }
+
+    if (filters.contentRating !== 'all') {
+      nextParams.set('contentRating', filters.contentRating);
+    }
+
+    if (filters.sort !== 'followedCount') {
+      nextParams.set('sort', filters.sort);
+    }
+
+    if (filters.includedTags.length > 0) {
+      nextParams.set('includedTags', filters.includedTags.join(','));
+    }
+
+    const nextSearch = nextParams.toString();
+    setSearchParams(nextParams, { replace: true });
+    setStoredHomePath(buildPathWithSearch('/', nextSearch));
+  }, [filters, page, search, setSearchParams, showFilters]);
 
   const updateFilter = (key, value) => {
     setFilters((current) => ({
@@ -144,6 +206,17 @@ const Home = () => {
     setPage(1);
   };
 
+  const handlePageJump = (event) => {
+    event.preventDefault();
+    const nextPage = parsePageNumber(pageInput, page);
+
+    if (nextPage !== page) {
+      setPage(nextPage);
+    } else {
+      setPageInput(String(page));
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-6 sm:px-6 sm:py-8">
       <h1 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-100">Welcome to Manwhanted</h1>
@@ -151,7 +224,7 @@ const Home = () => {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h2 className="text-2xl font-semibold text-gray-100">Featured Series</h2>
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm">
           <span className="text-sm text-gray-500">Page {page}</span>
           <Link to="/browse" className="text-blue-600 hover:underline">
             Browse all
@@ -324,6 +397,26 @@ const Home = () => {
                 >
                   Next
                 </button>
+                <form onSubmit={handlePageJump} className="flex flex-wrap items-center justify-center gap-2">
+                  <label className="text-sm text-gray-400" htmlFor="home-page-input">
+                    Go to page
+                  </label>
+                  <input
+                    id="home-page-input"
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    className="w-24 rounded border border-gray-600 bg-gray-900 px-3 py-2 text-gray-100"
+                    value={pageInput}
+                    onChange={(event) => setPageInput(event.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded bg-gray-700 text-gray-100 hover:bg-gray-600"
+                  >
+                    Go
+                  </button>
+                </form>
               </div>
             </>
           )}

@@ -4,6 +4,7 @@ import api from '../api';
 import { BookmarkContext } from '../context/BookmarkContext';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
+import { getStoredHomePath } from '../utils/navigationState';
 
 const SeriesDetail = () => {
   const CHAPTERS_PER_PAGE = 25;
@@ -66,9 +67,15 @@ const SeriesDetail = () => {
   const visibleChapters = Array.isArray(series.chapters)
     ? series.chapters.slice(chapterStartIndex, chapterStartIndex + CHAPTERS_PER_PAGE)
     : [];
+  const homeHref = getStoredHomePath();
 
   return (
     <div className="container mx-auto p-8">
+      <div className="mb-6">
+        <Link to={homeHref} className="text-blue-600 hover:underline">
+          Back to home results
+        </Link>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
           <img

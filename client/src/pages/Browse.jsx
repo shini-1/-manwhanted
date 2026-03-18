@@ -13,6 +13,7 @@ const Browse = () => {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [pageInput, setPageInput] = useState('1');
   const [hasNextPage, setHasNextPage] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filterOptions, setFilterOptions] = useState({
@@ -86,6 +87,10 @@ const Browse = () => {
     loadSeries();
   }, [page, search, filters]);
 
+  useEffect(() => {
+    setPageInput(String(page));
+  }, [page]);
+
   const updateFilter = (key, value) => {
     setFilters((current) => ({
       ...current,
@@ -118,6 +123,18 @@ const Browse = () => {
       includedTags: [],
     });
     setPage(1);
+  };
+
+  const handlePageJump = (event) => {
+    event.preventDefault();
+    const nextPage = Number.parseInt(pageInput, 10);
+
+    if (Number.isFinite(nextPage) && nextPage > 0) {
+      setPage(nextPage);
+      return;
+    }
+
+    setPageInput(String(page));
   };
 
   return (
@@ -284,6 +301,26 @@ const Browse = () => {
                 >
                   Next
                 </button>
+                <form onSubmit={handlePageJump} className="flex flex-wrap items-center justify-center gap-2">
+                  <label className="text-sm text-gray-400" htmlFor="browse-page-input">
+                    Go to page
+                  </label>
+                  <input
+                    id="browse-page-input"
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    className="w-24 rounded border border-gray-600 bg-gray-900 px-3 py-2 text-gray-100"
+                    value={pageInput}
+                    onChange={(event) => setPageInput(event.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded bg-gray-700 text-gray-100 hover:bg-gray-600"
+                  >
+                    Go
+                  </button>
+                </form>
               </div>
             </>
           )}
