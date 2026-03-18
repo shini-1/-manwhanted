@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import api from '../api';
 import { BookmarkContext } from '../context/BookmarkContext';
 import LoadingSpinner from '../LoadingSpinner';
@@ -7,7 +7,6 @@ import ErrorAlert from '../ErrorAlert';
 
 const SeriesDetail = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { bookmarks, addBookmark, removeBookmark } = useContext(BookmarkContext);
   const [series, setSeries] = useState(null);
   const [resumeChapterId, setResumeChapterId] = useState(null);
@@ -27,9 +26,7 @@ const SeriesDetail = () => {
         await addBookmark(id);
       }
     } catch (err) {
-      if (err?.response?.status === 401) {
-        navigate('/login');
-      }
+      setError('Unable to update bookmarks.');
     }
   };
 
@@ -46,20 +43,7 @@ const SeriesDetail = () => {
         if (savedChapter) {
           setResumeChapterId(savedChapter);
         }
-
-        try {
-          const resHistory = await api.get(`/users/history/${id}`);
-          if (resHistory?.data?.chapterId) {
-            setResumeChapterId(resHistory.data.chapterId);
-          }
-        } catch (err) {
-          // ignore; this is optional
-        }
       } catch (err) {
-        if (err?.response?.status === 401) {
-          navigate('/login');
-          return;
-        }
         setError(err?.response?.data?.message || 'Failed to load series.');
       } finally {
         setLoading(false);
@@ -67,7 +51,7 @@ const SeriesDetail = () => {
     };
 
     loadSeries();
-  }, [id, navigate]);
+  }, [id]);
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorAlert message={error} />;
@@ -107,7 +91,7 @@ const SeriesDetail = () => {
             {resumeChapterId && (
               <button
                 className="w-full py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
-                onClick={() => navigate(`/read/${resumeChapterId}`)}
+                onClick={() => window.location.assign(`/read/${resumeChapterId}`)}
               >
                 Resume Reading
               </button>

@@ -1,14 +1,11 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import api from '../api';
-import { AuthContext } from '../context/AuthContext';
 import { BookmarkContext } from '../context/BookmarkContext';
 import SeriesCard from '../SeriesCard';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 
 const Bookmarks = () => {
-  const { user } = useContext(AuthContext);
   const { bookmarks } = useContext(BookmarkContext);
 
   const isBookmarkedArray = Array.isArray(bookmarks);
@@ -16,16 +13,8 @@ const Bookmarks = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const navigate = useNavigate();
-
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-    }
-  }, [user, navigate]);
-
-  useEffect(() => {
-if (!bookmarks || !isBookmarkedArray) {
+    if (!bookmarks || !isBookmarkedArray) {
       return;
     }
 
@@ -42,10 +31,6 @@ if (!bookmarks || !isBookmarkedArray) {
         const res = await api.get(`/series?ids=${ids}`);
         setSeries(res.data);
       } catch (err) {
-        if (err?.response?.status === 401) {
-          navigate('/login');
-          return;
-        }
         setError(err?.response?.data?.message || 'Failed to load bookmarks.');
       } finally {
         setLoading(false);
@@ -53,7 +38,7 @@ if (!bookmarks || !isBookmarkedArray) {
     };
 
     loadSeries();
-  }, [bookmarks, navigate]);
+  }, [bookmarks]);
 
   return (
     <div className="container mx-auto p-8">

@@ -1,11 +1,5 @@
 import Series from './models/series.js';
 import Chapter from './models/chapter.js';
-import User from './models/user.js';
-import bcrypt from 'bcryptjs';
-const DEFAULT_USER = {
-    email: 'reader@example.com',
-    password: 'password123',
-};
 const SAMPLE_SERIES = [
     {
         title: 'Skybound Chronicles',
@@ -56,7 +50,6 @@ const SAMPLE_SERIES = [
 export async function seedDatabase() {
     // Only seed if collections are empty
     const seriesCount = await Series.countDocuments();
-    const userCount = await User.countDocuments();
     if (seriesCount === 0) {
         const createdSeries = [];
         for (const seriesData of SAMPLE_SERIES) {
@@ -84,10 +77,5 @@ export async function seedDatabase() {
             createdSeries.push(series);
         }
         console.log(`Seeded ${createdSeries.length} series`);
-    }
-    if (userCount === 0) {
-        const hashedPassword = await bcrypt.hash(DEFAULT_USER.password, 10);
-        await new User({ email: DEFAULT_USER.email, password: hashedPassword }).save();
-        console.log(`Seeded default user: ${DEFAULT_USER.email} / ${DEFAULT_USER.password}`);
     }
 }

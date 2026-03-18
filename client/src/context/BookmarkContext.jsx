@@ -1,40 +1,33 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import api from '../api';
-import { AuthContext } from './AuthContext';
+import React, { createContext, useState, useEffect } from 'react';
 
 export const BookmarkContext = createContext();
+const BOOKMARKS_STORAGE_KEY = 'manwhanted:bookmarks';
 
 export const BookmarkProvider = ({ children }) => {
-  const { user } = useContext(AuthContext);
   const [bookmarks, setBookmarks] = useState([]);
 
   useEffect(() => {
-    const loadBookmarks = async () => {
-      if (!user) {
-        setBookmarks([]);
-        return;
-      }
+    try {
+      const saved = localStorage.getItem(BOOKMARKS_STORAGE_KEY);
+      setBookmarks(saved ? JSON.parse(saved) : []);
+    } catch (err) {
+      console.error('Unable to load local bookmarks', err);
+      setBookmarks([]);
+    }
+  }, []);
 
-      try {
-        const res = await api.get('/users/bookmarks');
-        setBookmarks(res.data);
-      } catch (err) {
-        console.error('Unable to load bookmarks', err);
-        setBookmarks([]);
-      }
-    };
-
-    loadBookmarks();
-  }, [user]);
+  useEffect(() => {
+    localStorage.setItem(BOOKMARKS_STORAGE_KEY, JSON.stringify(bookmarks));
+  }, [bookmarks]);
 
   const addBookmark = async (seriesId) => {
-    await api.post(`/users/bookmarks/${seriesId}`);
-    setBookmarks([...bookmarks, seriesId]);
+    setBookmarks((current) => (
+      current.includes(seriesId) ? current : [...current, seriesId]
+    ));
   };
 
   const removeBookmark = async (seriesId) => {
-    await api.delete(`/users/bookmarks/${seriesId}`);
-    setBookmarks(bookmarks.filter(id => id !== seriesId));
+    setBookmarks((current) => current.filter((id) => id !== seriesId));
   };
 
   return (

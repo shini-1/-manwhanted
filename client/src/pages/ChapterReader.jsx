@@ -33,19 +33,8 @@ const ChapterReader = () => {
         // Persist last-read chapter per series (local cache)
         if (res.data.series) {
           localStorage.setItem(`manwhanted:lastRead:${res.data.series}`, id);
-
-          // Also persist for logged in users (server-side history)
-          try {
-            await api.post(`/users/history/${res.data.series}`, { chapterId: id });
-          } catch (e) {
-            // ignore, optional tracking
-          }
         }
       } catch (err) {
-        if (err?.response?.status === 401) {
-          navigate('/login');
-          return;
-        }
         setError(err?.response?.data?.message || 'Failed to load chapter.');
       } finally {
         setLoading(false);

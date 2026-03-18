@@ -1,8 +1,5 @@
 import express from 'express';
-import { register, login, me } from './controllers/authController.js';
-import { getBookmarks, addBookmark, removeBookmark, getReadingHistory, setReadingHistory } from './controllers/userController.js';
 import { listSeries, getSeriesById, getSeriesChapters, getChapterById, } from './controllers/seriesController.js';
-import { authMiddleware } from './middleware/auth.js';
 import { logError } from './controllers/logController.js';
 import { importPopular } from './controllers/mangadex.controller.js';
 const router = express.Router();
@@ -12,17 +9,6 @@ router.get('/', (req, res) => {
 });
 // Client-side logging
 router.post('/logs', logError);
-// Authentication
-router.post('/auth/register', register);
-router.post('/auth/login', login);
-router.get('/auth/me', authMiddleware, me);
-// User actions
-router.get('/users/bookmarks', authMiddleware, getBookmarks);
-router.post('/users/bookmarks/:seriesId', authMiddleware, addBookmark);
-router.delete('/users/bookmarks/:seriesId', authMiddleware, removeBookmark);
-// Reading history
-router.get('/users/history/:seriesId', authMiddleware, getReadingHistory);
-router.post('/users/history/:seriesId', authMiddleware, setReadingHistory);
 // MangaDex admin
 router.post('/admin/import-popular', importPopular);
 // Series / chapters
