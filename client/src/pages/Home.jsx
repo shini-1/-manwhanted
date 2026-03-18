@@ -145,13 +145,13 @@ const Home = () => {
   };
 
   return (
-    <div className="container mx-auto p-8">
-      <h1 className="text-4xl font-bold mb-4 text-gray-900">Welcome to Manwhanted</h1>
-      <p className="text-xl mb-12 text-gray-600">Your premier destination for manhwa and manga.</p>
+    <div className="container mx-auto px-4 py-6 sm:px-6 sm:py-8">
+      <h1 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-100">Welcome to Manwhanted</h1>
+      <p className="text-base sm:text-xl mb-8 sm:mb-12 text-gray-300">Your premier destination for manhwa and manga.</p>
 
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold">Featured Series</h2>
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <h2 className="text-2xl font-semibold text-gray-100">Featured Series</h2>
+        <div className="flex items-center gap-4 text-sm">
           <span className="text-sm text-gray-500">Page {page}</span>
           <Link to="/browse" className="text-blue-600 hover:underline">
             Browse all
@@ -160,9 +160,9 @@ const Home = () => {
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-        <div className="flex w-full md:w-2/3 gap-3">
+        <div className="flex w-full flex-col sm:flex-row md:w-2/3 gap-3">
           <input
-            className="w-full border rounded px-3 py-2"
+            className="w-full border border-gray-700 bg-gray-900 text-gray-100 placeholder:text-gray-400 rounded px-3 py-2"
             placeholder="Search MangaDex titles..."
             value={search}
             onChange={(e) => {
@@ -171,7 +171,7 @@ const Home = () => {
             }}
           />
           <button
-            className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700"
+            className="w-full sm:w-auto px-4 py-2 bg-gray-100 text-gray-900 rounded hover:bg-white"
             onClick={() => setShowFilters((current) => !current)}
           >
             Filters
@@ -183,11 +183,11 @@ const Home = () => {
       </div>
 
       {showFilters && (
-        <div className="mb-6 rounded-lg border bg-gray-50 p-4 space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-lg font-semibold">MangaDex Filters</h2>
+        <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4 text-gray-900 shadow-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">MangaDex Filters</h2>
             <button
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-blue-700 hover:underline self-start"
               onClick={resetFilters}
             >
               Reset filters
@@ -196,9 +196,9 @@ const Home = () => {
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <label className="flex flex-col gap-2 text-sm">
-              <span className="font-medium">Type</span>
+              <span className="font-medium text-gray-800">Type</span>
               <select
-                className="rounded border px-3 py-2"
+                className="rounded border border-gray-300 bg-white px-3 py-2 text-gray-900"
                 value={filters.origin}
                 onChange={(e) => updateFilter('origin', e.target.value)}
               >
@@ -209,9 +209,9 @@ const Home = () => {
             </label>
 
             <label className="flex flex-col gap-2 text-sm">
-              <span className="font-medium">Status</span>
+              <span className="font-medium text-gray-800">Status</span>
               <select
-                className="rounded border px-3 py-2"
+                className="rounded border border-gray-300 bg-white px-3 py-2 text-gray-900"
                 value={filters.status}
                 onChange={(e) => updateFilter('status', e.target.value)}
               >
@@ -222,9 +222,9 @@ const Home = () => {
             </label>
 
             <label className="flex flex-col gap-2 text-sm">
-              <span className="font-medium">Demographic</span>
+              <span className="font-medium text-gray-800">Demographic</span>
               <select
-                className="rounded border px-3 py-2"
+                className="rounded border border-gray-300 bg-white px-3 py-2 text-gray-900"
                 value={filters.demographic}
                 onChange={(e) => updateFilter('demographic', e.target.value)}
               >
@@ -235,9 +235,9 @@ const Home = () => {
             </label>
 
             <label className="flex flex-col gap-2 text-sm">
-              <span className="font-medium">Rating</span>
+              <span className="font-medium text-gray-800">Rating</span>
               <select
-                className="rounded border px-3 py-2"
+                className="rounded border border-gray-300 bg-white px-3 py-2 text-gray-900"
                 value={filters.contentRating}
                 onChange={(e) => updateFilter('contentRating', e.target.value)}
               >
@@ -248,9 +248,9 @@ const Home = () => {
             </label>
 
             <label className="flex flex-col gap-2 text-sm">
-              <span className="font-medium">Sort</span>
+              <span className="font-medium text-gray-800">Sort</span>
               <select
-                className="rounded border px-3 py-2"
+                className="rounded border border-gray-300 bg-white px-3 py-2 text-gray-900"
                 value={filters.sort}
                 onChange={(e) => updateFilter('sort', e.target.value)}
               >
@@ -262,7 +262,7 @@ const Home = () => {
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-medium">Genres / Themes</p>
+            <p className="text-sm font-medium text-gray-800">Genres / Themes</p>
             <div className="flex flex-wrap gap-2">
               {filterOptions.tags.slice(0, MAX_VISIBLE_TAGS).map((tag) => {
                 const active = filters.includedTags.includes(tag.id);
@@ -272,7 +272,7 @@ const Home = () => {
                     className={`rounded-full px-3 py-1 text-sm border ${
                       active
                         ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-700 border-gray-300'
+                        : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-100'
                     }`}
                     onClick={() => toggleTag(tag.id)}
                   >
@@ -308,7 +308,7 @@ const Home = () => {
                 ))}
               </div>
               
-              <div className="mt-8 flex items-center justify-center gap-4">
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                 <button
                   className="px-4 py-2 rounded bg-gray-200 text-gray-800 disabled:opacity-50"
                   onClick={() => setPage((current) => Math.max(current - 1, 1))}
