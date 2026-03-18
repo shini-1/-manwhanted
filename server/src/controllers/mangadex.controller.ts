@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { mangadexService } from '../services/mangadex.service';
-import Series from '../models/series';
+import { mangadexService } from '../services/mangadex.service.js';
+import Series from '../models/series.js';
 import mongoose from 'mongoose';
 
 export const importPopular = async (req: Request, res: Response) => {

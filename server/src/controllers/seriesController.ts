@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import Series from '../models/series';
-import Chapter from '../models/chapter';
+import Series from '../models/series.js';
+import Chapter from '../models/chapter.js';
 
 export const listSeries = async (req: Request, res: Response) => {
   try {

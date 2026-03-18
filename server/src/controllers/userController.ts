@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import mongoose from 'mongoose';
-import User from '../models/user';
-import { AuthRequest } from '../middleware/auth';
+import User from '../models/user.js';
+import { AuthRequest } from '../middleware/auth.js';
 
 export const getBookmarks = async (req: AuthRequest, res: Response) => {
   const userId = req.userId;

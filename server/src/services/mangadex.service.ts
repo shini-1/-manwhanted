@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { ISeries } from '../models/series';
+import { ISeries } from '../models/series.js';
 import process from 'node:process';
 
 const BASE_URL = process.env.MANGADEX_API_BASE || 'https://api.mangadex.org';

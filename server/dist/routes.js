@@ -1,10 +1,10 @@
 import express from 'express';
 import { register, login, me } from './controllers/authController.js';
-import { getBookmarks, addBookmark, removeBookmark, getReadingHistory, setReadingHistory } from './controllers/userController';
-import { listSeries, getSeriesById, getSeriesChapters, getChapterById, } from './controllers/seriesController';
-import { authMiddleware } from './middleware/auth';
-import { logError } from './controllers/logController';
-import { importPopular } from './controllers/mangadex.controller';
+import { getBookmarks, addBookmark, removeBookmark, getReadingHistory, setReadingHistory } from './controllers/userController.js';
+import { listSeries, getSeriesById, getSeriesChapters, getChapterById, } from './controllers/seriesController.js';
+import { authMiddleware } from './middleware/auth.js';
+import { logError } from './controllers/logController.js';
+import { importPopular } from './controllers/mangadex.controller.js';
 const router = express.Router();
 // Health check
 router.get('/', (req, res) => {

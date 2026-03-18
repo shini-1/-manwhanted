@@ -1,5 +1,5 @@
-import { mangadexService } from '../services/mangadex.service';
-import Series from '../models/series';
+import { mangadexService } from '../services/mangadex.service.js';
+import Series from '../models/series.js';
 export const importPopular = async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 20;
