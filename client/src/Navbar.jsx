@@ -1,7 +1,6 @@
 import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { AuthContext } from './context/AuthContext';
-import { FaUser, FaBookmark } from 'react-icons/fa';
 
 export default function Navbar() {
   const { user, logout } = useContext(AuthContext);
@@ -16,11 +15,9 @@ export default function Navbar() {
         {user ? (
           <>
             <Link to="/bookmarks" className="flex items-center gap-1">
-              <FaBookmark />
               <span className="hidden sm:inline">Bookmarks</span>
             </Link>
             <button onClick={logout} className="flex items-center gap-1">
-              <FaUser />
               <span className="hidden sm:inline">Logout</span>
             </button>
           </>

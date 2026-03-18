@@ -2,6 +2,7 @@ import { Response } from 'express';
 import mongoose from 'mongoose';
 import User from '../models/user.js';
 import { AuthRequest } from '../middleware/auth.js';
+import { ensureDatabaseConnection, isDatabaseConfigurationError } from '../services/database.js';
 
 export const getBookmarks = async (req: AuthRequest, res: Response) => {
   const userId = req.userId;
@@ -10,6 +11,7 @@ export const getBookmarks = async (req: AuthRequest, res: Response) => {
   }
 
   try {
+    await ensureDatabaseConnection();
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -18,6 +20,9 @@ export const getBookmarks = async (req: AuthRequest, res: Response) => {
     return res.json(user.bookmarks);
   } catch (err) {
     console.error('Get bookmarks error:', err);
+    if (isDatabaseConfigurationError(err)) {
+      return res.status(503).json({ message: 'Bookmarks are unavailable until the database is configured.' });
+    }
     return res.status(500).json({ message: 'Server error' });
   }
 };
@@ -30,6 +35,7 @@ export const addBookmark = async (req: AuthRequest, res: Response) => {
   }
 
   try {
+    await ensureDatabaseConnection();
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -44,6 +50,9 @@ export const addBookmark = async (req: AuthRequest, res: Response) => {
     return res.status(200).json({ bookmarks: user.bookmarks });
   } catch (err) {
     console.error('Add bookmark error:', err);
+    if (isDatabaseConfigurationError(err)) {
+      return res.status(503).json({ message: 'Bookmarks are unavailable until the database is configured.' });
+    }
     return res.status(500).json({ message: 'Server error' });
   }
 };
@@ -56,6 +65,7 @@ export const removeBookmark = async (req: AuthRequest, res: Response) => {
   }
 
   try {
+    await ensureDatabaseConnection();
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -67,6 +77,9 @@ export const removeBookmark = async (req: AuthRequest, res: Response) => {
     return res.status(200).json({ bookmarks: user.bookmarks });
   } catch (err) {
     console.error('Remove bookmark error:', err);
+    if (isDatabaseConfigurationError(err)) {
+      return res.status(503).json({ message: 'Bookmarks are unavailable until the database is configured.' });
+    }
     return res.status(500).json({ message: 'Server error' });
   }
 };
@@ -79,6 +92,7 @@ export const getReadingHistory = async (req: AuthRequest, res: Response) => {
   }
 
   try {
+    await ensureDatabaseConnection();
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -91,6 +105,9 @@ export const getReadingHistory = async (req: AuthRequest, res: Response) => {
     return res.json({ chapterId: entry?.chapter || null });
   } catch (err) {
     console.error('Get reading history error:', err);
+    if (isDatabaseConfigurationError(err)) {
+      return res.status(503).json({ message: 'Reading history is unavailable until the database is configured.' });
+    }
     return res.status(500).json({ message: 'Server error' });
   }
 };
@@ -109,6 +126,7 @@ export const setReadingHistory = async (req: AuthRequest, res: Response) => {
   }
 
   try {
+    await ensureDatabaseConnection();
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -134,6 +152,9 @@ export const setReadingHistory = async (req: AuthRequest, res: Response) => {
     return res.status(200).json({ chapterId });
   } catch (err) {
     console.error('Set reading history error:', err);
+    if (isDatabaseConfigurationError(err)) {
+      return res.status(503).json({ message: 'Reading history is unavailable until the database is configured.' });
+    }
     return res.status(500).json({ message: 'Server error' });
   }
 };

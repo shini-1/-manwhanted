@@ -6,12 +6,12 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import routes from './routes.js';
 import { seedDatabase } from './seed.js';
+import { isDatabaseConfigurationError } from './services/database.js';
 dotenv.config();
 const allowedOrigins = (process.env.CLIENT_URL || 'https://manwhanted-client.vercel.app')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
-let mongoConnectionPromise = null;
 const resolveCorsOrigin = (requestOrigin) => {
     if (!requestOrigin) {
         return allowedOrigins[0];
@@ -27,26 +27,6 @@ const applyCorsHeaders = (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Vary', 'Origin');
-};
-const connectToDatabase = async () => {
-    const mongoUri = process.env.MONGO_URI;
-    if (!mongoUri) {
-        throw new Error('MONGO_URI is not configured for the server deployment.');
-    }
-    if (mongoose.connection.readyState === 1) {
-        return mongoose;
-    }
-    if (!mongoConnectionPromise) {
-        mongoConnectionPromise = mongoose.connect(mongoUri);
-    }
-    try {
-        await mongoConnectionPromise;
-        return mongoose;
-    }
-    catch (error) {
-        mongoConnectionPromise = null;
-        throw error;
-    }
 };
 // Create app
 const app = express();
@@ -65,9 +45,6 @@ export default async function handler(req, res) {
         return res.status(204).end();
     }
     try {
-        // Reuse the same Mongo connection across warm serverless invocations.
-        await connectToDatabase();
-        console.log('MongoDB connected');
         // Use Express to handle request
         await new Promise((resolve, reject) => {
             app(req, res);
@@ -78,9 +55,8 @@ export default async function handler(req, res) {
     catch (err) {
         console.error('Handler error:', err);
         if (!res.headersSent) {
-            const isConfigError = err instanceof Error && err.message.includes('MONGO_URI');
             res.status(500).json({
-                message: isConfigError ? 'Server configuration error' : 'Server error',
+                message: isDatabaseConfigurationError(err) ? 'Server configuration error' : 'Server error',
             });
         }
     }
