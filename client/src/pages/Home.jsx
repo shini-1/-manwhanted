@@ -224,12 +224,9 @@ const Home = () => {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h2 className="text-2xl font-semibold text-gray-100">Featured Series</h2>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
-          <span className="text-sm text-gray-500">Page {page}</span>
-          <Link to="/browse" className="text-blue-600 hover:underline">
-            Browse all
-          </Link>
-        </div>
+        <Link to="/browse" className="text-blue-600 hover:underline text-sm">
+          Browse all
+        </Link>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">

@@ -160,9 +160,6 @@ const Browse = () => {
             Filters
           </button>
         </div>
-        <div className="text-sm text-gray-600">
-          Page {page}
-        </div>
       </div>
 
       {showFilters && (

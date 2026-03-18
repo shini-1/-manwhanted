@@ -68,40 +68,43 @@ const ChapterReader = () => {
     });
   };
 
+  const chapterNavigation = (
+    <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+      {prevChapterId ? (
+        <Link
+          to={`/read/${prevChapterId}`}
+          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+        >
+          Previous Chapter
+        </Link>
+      ) : (
+        <span className="px-4 py-2 text-gray-500">Previous Chapter</span>
+      )}
+      {nextChapterId ? (
+        <Link
+          to={`/read/${nextChapterId}`}
+          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+        >
+          Next Chapter
+        </Link>
+      ) : (
+        <span className="px-4 py-2 text-gray-500">Next Chapter</span>
+      )}
+    </div>
+  );
+
   return (
     <div className="max-w-4xl mx-auto p-4">
-      <div className="mb-4">
-        <Link to={homeHref} className="text-blue-600 hover:underline">
-          Back to home results
-        </Link>
-      </div>
-      <div className="mb-8 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          {prevChapterId ? (
-            <Link
-              to={`/read/${prevChapterId}`}
-              className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300"
-            >
-              ← Prev
-            </Link>
-          ) : (
-            <span className="px-3 py-2 text-gray-400">← Prev</span>
-          )}
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <Link to={homeHref} className="text-blue-600 hover:underline">
+            Back to home results
+          </Link>
           <Link to={`/series/${chapter.series}`} className="text-blue-600 hover:underline">
             Back to series
           </Link>
-          {nextChapterId ? (
-            <Link
-              to={`/read/${nextChapterId}`}
-              className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300"
-            >
-              Next →
-            </Link>
-          ) : (
-            <span className="px-3 py-2 text-gray-400">Next →</span>
-          )}
         </div>
-        <div className="text-right">
+        <div className="text-left sm:text-right">
           <h1 className="text-2xl font-bold">{chapter.title}</h1>
           <span className="text-gray-500">Chapter {chapter.number}</span>
         </div>
@@ -131,6 +134,7 @@ const ChapterReader = () => {
           <p className="text-gray-500">No pages available for this chapter.</p>
         )}
       </div>
+      {chapterNavigation}
     </div>
   );
 };

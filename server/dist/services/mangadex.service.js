@@ -25,6 +25,29 @@ class MangaDexService {
             return values.en_us;
         return Object.values(values)[0] || '';
     }
+    pickEnglishAltTitle(altTitles) {
+        if (!Array.isArray(altTitles)) {
+            return '';
+        }
+        for (const altTitle of altTitles) {
+            if (altTitle.en)
+                return altTitle.en;
+            if (altTitle.en_us)
+                return altTitle.en_us;
+        }
+        return '';
+    }
+    pickSeriesTitle(attributes) {
+        const directEnglishTitle = attributes.title?.en || attributes.title?.en_us || '';
+        const englishAltTitle = this.pickEnglishAltTitle(attributes.altTitles);
+        if (directEnglishTitle) {
+            return directEnglishTitle;
+        }
+        if (['ko', 'zh', 'zh-hk'].includes(attributes.originalLanguage || '') && englishAltTitle) {
+            return englishAltTitle;
+        }
+        return englishAltTitle || this.pickLocalizedValue(attributes.title) || 'Unknown Title';
+    }
     toSeriesId(externalId) {
         return `${MANGADEX_SERIES_PREFIX}${externalId}`;
     }
@@ -234,7 +257,7 @@ class MangaDexService {
     transformManga(manga) {
         const attributes = manga.attributes;
         const externalId = manga.id;
-        const title = this.pickLocalizedValue(attributes.title) || 'Unknown Title';
+        const title = this.pickSeriesTitle(attributes);
         const description = this.pickLocalizedValue(attributes.description);
         const genres = [];
         if (attributes.tags) {
@@ -330,7 +353,7 @@ class MangaDexService {
                 const attributes = manga.attributes;
                 const id = manga.id;
                 const transformed = {
-                    title: this.pickLocalizedValue(attributes.title) || 'Unknown Title',
+                    title: this.pickSeriesTitle(attributes),
                     description: this.pickLocalizedValue(attributes.description),
                     status: attributes.status || 'ongoing',
                     externalId: id,
