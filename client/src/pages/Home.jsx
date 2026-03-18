@@ -7,6 +7,9 @@ import ErrorAlert from '../ErrorAlert';
 import { buildPathWithSearch, setStoredHomePath } from '../utils/navigationState';
 const MAX_VISIBLE_TAGS = 24;
 const HOME_PAGE_SIZE = 12;
+const LAST_READ_PREFIX = 'manwhanted:lastRead:';
+const LAST_READ_AT_PREFIX = 'manwhanted:lastReadAt:';
+const MAX_RESUME_ITEMS = 4;
 
 // Fallback sample series so the UI is usable even if the backend isn't reachable.
 const SAMPLE_SERIES = [
@@ -38,10 +41,40 @@ const parseIncludedTags = (value) =>
     ? value.split(',').map((tag) => tag.trim()).filter(Boolean)
     : [];
 
+const getResumeEntriesFromStorage = () => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  return Object.keys(window.localStorage)
+    .filter((key) => key.startsWith(LAST_READ_PREFIX))
+    .map((key) => {
+      const seriesId = key.slice(LAST_READ_PREFIX.length);
+      const chapterId = window.localStorage.getItem(key);
+      if (!seriesId || !chapterId) {
+        return null;
+      }
+
+      const readAtRaw = window.localStorage.getItem(`${LAST_READ_AT_PREFIX}${seriesId}`) || '';
+      const readAt = Number.parseInt(readAtRaw, 10);
+
+      return {
+        seriesId,
+        chapterId,
+        readAt: Number.isFinite(readAt) ? readAt : 0,
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.readAt - left.readAt)
+    .slice(0, MAX_RESUME_ITEMS);
+};
+
 const Home = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   // Use sample series as a fallback so the UI is usable even if the API is not available.
   const [featured, setFeatured] = useState(SAMPLE_SERIES);
+  const [resumeItems, setResumeItems] = useState([]);
+  const [resumeLoading, setResumeLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(() => parsePageNumber(searchParams.get('page')));
@@ -65,6 +98,55 @@ const Home = () => {
     sort: searchParams.get('sort') || 'followedCount',
     includedTags: parseIncludedTags(searchParams.get('includedTags')),
   });
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadResumeItems = async () => {
+      setResumeLoading(true);
+      const resumeEntries = getResumeEntriesFromStorage();
+
+      if (resumeEntries.length === 0) {
+        if (!ignore) {
+          setResumeItems([]);
+          setResumeLoading(false);
+        }
+        return;
+      }
+
+      const resolvedEntries = await Promise.all(
+        resumeEntries.map(async (entry) => {
+          try {
+            const [seriesRes, chapterRes] = await Promise.all([
+              api.get(`/series/${entry.seriesId}`),
+              api.get(`/chapters/${entry.chapterId}`),
+            ]);
+
+            return {
+              ...entry,
+              seriesTitle: seriesRes.data?.title || 'Unknown series',
+              seriesCover: seriesRes.data?.coverImage || '',
+              chapterTitle: chapterRes.data?.title || '',
+              chapterNumber: chapterRes.data?.number || '?',
+            };
+          } catch (resumeError) {
+            return null;
+          }
+        })
+      );
+
+      if (!ignore) {
+        setResumeItems(resolvedEntries.filter(Boolean));
+        setResumeLoading(false);
+      }
+    };
+
+    loadResumeItems();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   useEffect(() => {
     const loadFilters = async () => {
@@ -221,6 +303,51 @@ const Home = () => {
     <div className="container mx-auto px-4 py-6 sm:px-6 sm:py-8">
       <h1 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-100">Welcome to Manwhanted</h1>
       <p className="text-base sm:text-xl mb-8 sm:mb-12 text-gray-300">Your premier destination for manhwa and manga.</p>
+
+      {(resumeLoading || resumeItems.length > 0) && (
+        <section className="mb-8 rounded-xl border border-gray-700 bg-gray-800/70 p-4 sm:p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-100">Resume Reading</h2>
+            {resumeItems[0] && (
+              <Link
+                to={`/read/${resumeItems[0].chapterId}`}
+                className="text-sm text-blue-400 hover:underline"
+              >
+                Continue Latest
+              </Link>
+            )}
+          </div>
+          {resumeLoading ? (
+            <p className="text-sm text-gray-400">Loading your progress...</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              {resumeItems.map((item) => (
+                <Link
+                  key={`${item.seriesId}:${item.chapterId}`}
+                  to={`/read/${item.chapterId}`}
+                  className="rounded-lg bg-gray-900 border border-gray-700 overflow-hidden hover:border-blue-500 transition"
+                >
+                  <img
+                    src={item.seriesCover || 'https://via.placeholder.com/500x750'}
+                    alt={item.seriesTitle}
+                    className="w-full h-36 object-cover"
+                    loading="lazy"
+                  />
+                  <div className="p-3">
+                    <p className="text-sm font-semibold text-gray-100 line-clamp-2">{item.seriesTitle}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Continue: Chapter {item.chapterNumber}
+                    </p>
+                    {item.chapterTitle && (
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.chapterTitle}</p>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h2 className="text-2xl font-semibold text-gray-100">Featured Series</h2>

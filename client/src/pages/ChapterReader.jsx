@@ -35,6 +35,7 @@ const ChapterReader = () => {
         // Persist last-read chapter per series (local cache)
         if (res.data.series) {
           localStorage.setItem(`manwhanted:lastRead:${res.data.series}`, id);
+          localStorage.setItem(`manwhanted:lastReadAt:${res.data.series}`, String(Date.now()));
         }
       } catch (err) {
         setError(err?.response?.data?.message || 'Failed to load chapter.');
