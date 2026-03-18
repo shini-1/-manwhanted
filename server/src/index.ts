@@ -9,6 +9,57 @@ import { seedDatabase } from './seed.js';
 
 dotenv.config();
 
+const allowedOrigins = (process.env.CLIENT_URL || 'https://manwhanted-client.vercel.app')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+let mongoConnectionPromise: Promise<typeof mongoose> | null = null;
+
+const resolveCorsOrigin = (requestOrigin?: string) => {
+  if (!requestOrigin) {
+    return allowedOrigins[0];
+  }
+
+  if (allowedOrigins.includes(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  return allowedOrigins[0];
+};
+
+const applyCorsHeaders = (req: any, res: any) => {
+  res.setHeader('Access-Control-Allow-Origin', resolveCorsOrigin(req.headers.origin));
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Vary', 'Origin');
+};
+
+const connectToDatabase = async () => {
+  const mongoUri = process.env.MONGO_URI;
+
+  if (!mongoUri) {
+    throw new Error('MONGO_URI is not configured for the server deployment.');
+  }
+
+  if (mongoose.connection.readyState === 1) {
+    return mongoose;
+  }
+
+  if (!mongoConnectionPromise) {
+    mongoConnectionPromise = mongoose.connect(mongoUri);
+  }
+
+  try {
+    await mongoConnectionPromise;
+    return mongoose;
+  } catch (error) {
+    mongoConnectionPromise = null;
+    throw error;
+  }
+};
+
 // Create app
 const app = express();
 
@@ -24,10 +75,15 @@ app.use('/api', routes);
 
 // Vercel serverless handler
 export default async function handler(req: any, res: any) {
+  applyCorsHeaders(req, res);
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
   try {
-    // Connect to MongoDB per invocation (serverless)
-    const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/manwhanted';
-    await mongoose.connect(mongoUri);
+    // Reuse the same Mongo connection across warm serverless invocations.
+    await connectToDatabase();
     console.log('MongoDB connected');
 
     // Use Express to handle request
@@ -39,7 +95,10 @@ export default async function handler(req: any, res: any) {
   } catch (err) {
     console.error('Handler error:', err);
     if (!res.headersSent) {
-      res.status(500).json({ message: 'Server error' });
+      const isConfigError = err instanceof Error && err.message.includes('MONGO_URI');
+      res.status(500).json({
+        message: isConfigError ? 'Server configuration error' : 'Server error',
+      });
     }
   }
 }
@@ -62,4 +121,3 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`Dev server: http://localhost:${PORT}`);
   });
 }
-
