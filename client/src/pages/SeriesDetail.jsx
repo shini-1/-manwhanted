@@ -6,12 +6,14 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 
 const SeriesDetail = () => {
+  const CHAPTERS_PER_PAGE = 25;
   const { id } = useParams();
   const { bookmarks, addBookmark, removeBookmark } = useContext(BookmarkContext);
   const [series, setSeries] = useState(null);
   const [resumeChapterId, setResumeChapterId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [chapterPage, setChapterPage] = useState(1);
   const isExternalSeries = Boolean(id?.startsWith('md_'));
 
   const isBookmarked = () => Array.isArray(bookmarks) && bookmarks.includes(id);
@@ -38,6 +40,7 @@ const SeriesDetail = () => {
       try {
         const res = await api.get(`/series/${id}`);
         setSeries(res.data);
+        setChapterPage(1);
 
         const savedChapter = localStorage.getItem(`manwhanted:lastRead:${id}`);
         if (savedChapter) {
@@ -56,6 +59,13 @@ const SeriesDetail = () => {
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorAlert message={error} />;
   if (!series) return null;
+
+  const chapterCount = Array.isArray(series.chapters) ? series.chapters.length : 0;
+  const totalChapterPages = chapterCount > 0 ? Math.ceil(chapterCount / CHAPTERS_PER_PAGE) : 1;
+  const chapterStartIndex = (chapterPage - 1) * CHAPTERS_PER_PAGE;
+  const visibleChapters = Array.isArray(series.chapters)
+    ? series.chapters.slice(chapterStartIndex, chapterStartIndex + CHAPTERS_PER_PAGE)
+    : [];
 
   return (
     <div className="container mx-auto p-8">
@@ -99,10 +109,38 @@ const SeriesDetail = () => {
           </div>
         </div>
         <div className="lg:col-span-2">
-          <h2 className="text-2xl font-semibold mb-4">Chapters</h2>
-          {Array.isArray(series.chapters) && series.chapters.length > 0 ? (
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-semibold">Chapters</h2>
+              <p className="text-sm text-gray-500">
+                {chapterCount} total chapter{chapterCount === 1 ? '' : 's'}
+              </p>
+            </div>
+            {chapterCount > CHAPTERS_PER_PAGE && (
+              <div className="flex items-center gap-3">
+                <button
+                  className="px-3 py-2 rounded bg-gray-200 text-gray-800 disabled:opacity-50"
+                  onClick={() => setChapterPage((current) => Math.max(current - 1, 1))}
+                  disabled={chapterPage === 1}
+                >
+                  Prev
+                </button>
+                <span className="text-sm text-gray-500">
+                  Page {chapterPage} of {totalChapterPages}
+                </span>
+                <button
+                  className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
+                  onClick={() => setChapterPage((current) => Math.min(current + 1, totalChapterPages))}
+                  disabled={chapterPage === totalChapterPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+          {visibleChapters.length > 0 ? (
             <div className="space-y-2">
-              {series.chapters.map((chapter) => (
+              {visibleChapters.map((chapter) => (
                 <div
                   key={chapter._id}
                   className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"

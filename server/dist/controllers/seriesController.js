@@ -4,14 +4,15 @@ import { ensureDatabaseConnection } from '../services/database.js';
 import { mangadexService } from '../services/mangadex.service.js';
 import { getFallbackChapterById, getFallbackSeriesById, getFallbackSeriesChapters, listFallbackSeries, } from '../services/fallbackCatalog.js';
 export const listSeries = async (req, res) => {
-    const { ids, source, limit } = req.query;
+    const { ids, source, limit, page } = req.query;
     const idList = typeof ids === 'string'
         ? ids.split(',').map(id => id.trim()).filter(Boolean)
         : undefined;
     const parsedLimit = typeof limit === 'string' ? Math.min(parseInt(limit, 10) || 12, 24) : 12;
+    const parsedPage = typeof page === 'string' ? Math.max(parseInt(page, 10) || 1, 1) : 1;
     try {
         if (source === 'mangadex') {
-            return res.json(await mangadexService.getPopularReadableManga(parsedLimit));
+            return res.json(await mangadexService.getPopularReadableManga(parsedPage, parsedLimit));
         }
         await ensureDatabaseConnection();
         if (idList?.length) {
