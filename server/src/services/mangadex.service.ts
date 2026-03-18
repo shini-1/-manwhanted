@@ -66,6 +66,24 @@ interface MangaDexTag {
   };
 }
 
+interface MangaDexAggregateChapter {
+  chapter: string | null;
+  id?: string;
+  isUnavailable?: boolean;
+  count?: number;
+}
+
+interface MangaDexAggregateVolume {
+  volume: string;
+  count: number;
+  chapters: Record<string, MangaDexAggregateChapter>;
+}
+
+interface MangaDexAggregateResponse {
+  result: string;
+  volumes: Record<string, MangaDexAggregateVolume>;
+}
+
 type MangaDexFilterOptions = {
   origin?: string;
   status?: string;
@@ -75,9 +93,22 @@ type MangaDexFilterOptions = {
   sort?: string;
 };
 
+type MangaDexReadableAvailability = {
+  chapterCount: number;
+  firstReadableChapter: string | null;
+  lastReadableChapter: string | null;
+  firstNumericChapter: number | null;
+  lastNumericChapter: number | null;
+  startsAtBeginning: boolean;
+  missingMainChapterNumbers: number[];
+  hasNoMissingMainChapters: boolean;
+  shouldSurfaceInListings: boolean;
+};
+
 class MangaDexService {
   private api: AxiosInstance;
   private tagCache: Array<{ id: string; name: string; group: string }> | null = null;
+  private availabilityCache = new Map<string, MangaDexReadableAvailability>();
 
   constructor() {
     this.api = axios.create({
@@ -174,6 +205,165 @@ class MangaDexService {
         number: chapter.attributes.chapter || '?',
         pages: chapter.attributes.pages,
       }));
+  }
+
+  private parseChapterNumber(chapter: string | null | undefined): number | null {
+    if (!chapter) {
+      return null;
+    }
+
+    const normalized = chapter.replace(/[^0-9.]/g, '');
+    if (!normalized) {
+      return null;
+    }
+
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private getAvailabilityEntries(aggregate: MangaDexAggregateResponse) {
+    const entries: Array<{ chapter: string | null; numeric: number | null }> = [];
+
+    for (const volume of Object.values(aggregate.volumes || {})) {
+      for (const chapter of Object.values(volume.chapters || {})) {
+        if (chapter.isUnavailable) {
+          continue;
+        }
+
+        entries.push({
+          chapter: chapter.chapter || null,
+          numeric: this.parseChapterNumber(chapter.chapter),
+        });
+      }
+    }
+
+    return entries.sort((left, right) => {
+      if (left.numeric === null && right.numeric === null) {
+        return (left.chapter || '').localeCompare(right.chapter || '');
+      }
+
+      if (left.numeric === null) {
+        return 1;
+      }
+
+      if (right.numeric === null) {
+        return -1;
+      }
+
+      return left.numeric - right.numeric;
+    });
+  }
+
+  private async getReadableAvailability(externalId: string): Promise<MangaDexReadableAvailability> {
+    const cached = this.availabilityCache.get(externalId);
+    if (cached) {
+      return cached;
+    }
+
+    const response = await this.api.get<MangaDexAggregateResponse>(`/manga/${externalId}/aggregate`, {
+      params: {
+        translatedLanguage: ['en'],
+      },
+    });
+
+    const entries = this.getAvailabilityEntries(response.data);
+    const numericEntries = entries
+      .map((entry) => entry.numeric)
+      .filter((value): value is number => value !== null);
+    const firstReadableChapter = entries[0]?.chapter || null;
+    const lastReadableChapter = entries[entries.length - 1]?.chapter || null;
+    const firstNumericChapter = numericEntries[0] ?? null;
+    const lastNumericChapter = numericEntries[numericEntries.length - 1] ?? null;
+    const startsAtBeginning = firstNumericChapter !== null && firstNumericChapter <= 1.5;
+    const coveredMainChapters = new Set(
+      numericEntries
+        .filter((chapter) => chapter >= 1)
+        .map((chapter) => Math.floor(chapter))
+    );
+    const maxMainChapter = coveredMainChapters.size > 0 ? Math.max(...coveredMainChapters) : 0;
+    const missingMainChapterNumbers: number[] = [];
+
+    for (let chapterNumber = 1; chapterNumber <= maxMainChapter; chapterNumber += 1) {
+      if (!coveredMainChapters.has(chapterNumber)) {
+        missingMainChapterNumbers.push(chapterNumber);
+      }
+    }
+
+    const hasNoMissingMainChapters = missingMainChapterNumbers.length === 0;
+    const shouldSurfaceInListings = entries.length > 0 && startsAtBeginning && hasNoMissingMainChapters;
+
+    const availability = {
+      chapterCount: entries.length,
+      firstReadableChapter,
+      lastReadableChapter,
+      firstNumericChapter,
+      lastNumericChapter,
+      startsAtBeginning,
+      missingMainChapterNumbers,
+      hasNoMissingMainChapters,
+      shouldSurfaceInListings,
+    };
+
+    this.availabilityCache.set(externalId, availability);
+    return availability;
+  }
+
+  private normalizeSearchText(value: string) {
+    return value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  private getListingScore(
+    series: ReturnType<MangaDexService['transformManga']> & {
+      chapterCount?: number;
+      firstReadableChapter?: string | null;
+      hasNoMissingMainChapters?: boolean;
+    },
+    query?: string
+  ) {
+    let score = series.chapterCount || 0;
+    const normalizedTitle = this.normalizeSearchText(series.title || '');
+
+    if (series.firstReadableChapter === '1' || series.firstReadableChapter === '0' || series.firstReadableChapter === '0.5') {
+      score += 50;
+    }
+
+    if (series.hasNoMissingMainChapters) {
+      score += 250;
+    }
+
+    if (!query) {
+      return score;
+    }
+
+    const normalizedQuery = this.normalizeSearchText(query);
+    if (!normalizedQuery) {
+      return score;
+    }
+
+    if (normalizedTitle === normalizedQuery) {
+      score += 1000;
+    } else if (normalizedTitle.startsWith(normalizedQuery)) {
+      score += 700;
+    } else if (normalizedTitle.includes(normalizedQuery)) {
+      score += 350;
+    }
+
+    if (normalizedTitle.includes('doujinshi')) {
+      score -= 400;
+    }
+
+    if (normalizedTitle.includes('anthology')) {
+      score -= 250;
+    }
+
+    if (normalizedTitle.includes('official comic anthology')) {
+      score -= 250;
+    }
+
+    return score;
   }
 
   isMangaDexSeriesId(id: string): boolean {
@@ -367,11 +557,17 @@ class MangaDexService {
     const safeLimit = Math.min(Math.max(limit, 1), 24);
     const batchSize = Math.min(Math.max(safeLimit * 3, 20), 100);
     const skip = (safePage - 1) * safeLimit;
-    const readableSeries = [];
+    const targetCount = skip + safeLimit + (extraParams.title ? safeLimit * 2 : 1);
+    const readableSeries: Array<ReturnType<MangaDexService['transformManga']> & {
+      chapterCount: number;
+      firstReadableChapter: string | null;
+      lastReadableChapter: string | null;
+      hasNoMissingMainChapters: boolean;
+    }> = [];
     let rawOffset = 0;
     let rawTotal = Number.POSITIVE_INFINITY;
 
-    while (readableSeries.length < skip + safeLimit + 1 && rawOffset < rawTotal) {
+    while (readableSeries.length < targetCount && rawOffset < rawTotal) {
       const response = await this.api.get<MangaDexListResponse<MangaDexManga>>('/manga', {
         params: this.buildMangaListParams(batchSize, rawOffset, extraParams, filters),
       });
@@ -383,23 +579,31 @@ class MangaDexService {
         mangaBatch
           .filter((manga) => this.matchesOriginFilter(manga, filters.origin))
           .map(async (manga) => {
-          const feedResponse = await this.getMangaFeedPage(manga.id, 5, 0);
-          const hasReadableChapter = feedResponse.data.data.some(
-            (chapter) => chapter.attributes.translatedLanguage === 'en' && chapter.attributes.pages > 0
-          );
+            const availability = await this.getReadableAvailability(manga.id);
+            if (!availability.shouldSurfaceInListings) {
+              return null;
+            }
 
-          return hasReadableChapter ? this.transformManga(manga) : null;
+            return {
+              ...this.transformManga(manga),
+              chapterCount: availability.chapterCount,
+              firstReadableChapter: availability.firstReadableChapter,
+              lastReadableChapter: availability.lastReadableChapter,
+              hasNoMissingMainChapters: availability.hasNoMissingMainChapters,
+            };
           })
       );
 
-      for (const readableSeriesItem of readableChecks) {
-        if (readableSeries.length >= skip + safeLimit + 1) {
+      const sortedBatch = readableChecks
+        .filter((item): item is NonNullable<typeof item> => Boolean(item))
+        .sort((left, right) => this.getListingScore(right, extraParams.title) - this.getListingScore(left, extraParams.title));
+
+      for (const readableSeriesItem of sortedBatch) {
+        if (readableSeries.length >= targetCount) {
           break;
         }
 
-        if (readableSeriesItem) {
-          readableSeries.push(readableSeriesItem);
-        }
+        readableSeries.push(readableSeriesItem);
       }
 
       if (mangaBatch.length === 0) {
@@ -472,17 +676,23 @@ class MangaDexService {
 
   async getReadableMangaById(seriesId: string) {
     const externalId = this.getExternalSeriesId(seriesId);
-    const [mangaResponse, chapters] = await Promise.all([
+    const [mangaResponse, chapters, availability] = await Promise.all([
       this.api.get<{ data: MangaDexManga }>(`/manga/${externalId}`, {
         params: { includes: ['cover_art'] },
       }),
       this.getAllMangaChapters(externalId),
+      this.getReadableAvailability(externalId),
     ]);
 
     const series = this.transformManga(mangaResponse.data.data);
 
     return {
       ...series,
+      chapterCount: availability.chapterCount,
+      firstReadableChapter: availability.firstReadableChapter,
+      lastReadableChapter: availability.lastReadableChapter,
+      hasNoMissingMainChapters: availability.hasNoMissingMainChapters,
+      missingMainChapterNumbers: availability.missingMainChapterNumbers,
       chapters: this.mapChaptersForSeries(chapters),
     };
   }
