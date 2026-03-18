@@ -1,13 +1,18 @@
 import Series from '../models/series.js';
 import Chapter from '../models/chapter.js';
 import { ensureDatabaseConnection } from '../services/database.js';
+import { mangadexService } from '../services/mangadex.service.js';
 import { getFallbackChapterById, getFallbackSeriesById, getFallbackSeriesChapters, listFallbackSeries, } from '../services/fallbackCatalog.js';
 export const listSeries = async (req, res) => {
-    const { ids } = req.query;
+    const { ids, source, limit } = req.query;
     const idList = typeof ids === 'string'
         ? ids.split(',').map(id => id.trim()).filter(Boolean)
         : undefined;
+    const parsedLimit = typeof limit === 'string' ? Math.min(parseInt(limit, 10) || 12, 24) : 12;
     try {
+        if (source === 'mangadex') {
+            return res.json(await mangadexService.getPopularReadableManga(parsedLimit));
+        }
         await ensureDatabaseConnection();
         if (idList?.length) {
             const series = await Series.find({ _id: { $in: idList } }).select('title coverImage genres status');
@@ -24,6 +29,9 @@ export const listSeries = async (req, res) => {
 export const getSeriesById = async (req, res) => {
     const { id } = req.params;
     try {
+        if (mangadexService.isMangaDexSeriesId(id)) {
+            return res.json(await mangadexService.getReadableMangaById(id));
+        }
         await ensureDatabaseConnection();
         const series = await Series.findById(id).populate({
             path: 'chapters',
@@ -47,6 +55,10 @@ export const getSeriesById = async (req, res) => {
 export const getSeriesChapters = async (req, res) => {
     const { id } = req.params;
     try {
+        if (mangadexService.isMangaDexSeriesId(id)) {
+            const series = await mangadexService.getReadableMangaById(id);
+            return res.json(series.chapters || []);
+        }
         await ensureDatabaseConnection();
         const chapters = await Chapter.find({ series: id }).select('title number');
         return res.json(chapters);
@@ -59,6 +71,9 @@ export const getSeriesChapters = async (req, res) => {
 export const getChapterById = async (req, res) => {
     const { id } = req.params;
     try {
+        if (mangadexService.isMangaDexChapterId(id)) {
+            return res.json(await mangadexService.getReadableChapterById(id));
+        }
         await ensureDatabaseConnection();
         const chapter = await Chapter.findById(id);
         if (!chapter) {

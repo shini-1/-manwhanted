@@ -13,6 +13,7 @@ const SeriesDetail = () => {
   const [resumeChapterId, setResumeChapterId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const isExternalSeries = Boolean(id?.startsWith('md_'));
 
   const isBookmarked = () => Array.isArray(bookmarks) && bookmarks.includes(id);
 
@@ -88,12 +89,20 @@ const SeriesDetail = () => {
           </p>
           <p className="text-sm text-gray-500 mb-6">Status: {series.status || 'Unknown'}</p>
           <div className="space-y-3">
-            <button
-              className={`w-full py-2 rounded-lg text-white ${isBookmarked() ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-              onClick={handleBookmarkToggle}
-            >
-              {isBookmarked() ? 'Remove Bookmark' : 'Add to Bookmarks'}
-            </button>
+            {!isExternalSeries && (
+              <button
+                className={`w-full py-2 rounded-lg text-white ${isBookmarked() ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                onClick={handleBookmarkToggle}
+              >
+                {isBookmarked() ? 'Remove Bookmark' : 'Add to Bookmarks'}
+              </button>
+            )}
+
+            {isExternalSeries && (
+              <p className="text-sm text-gray-500">
+                MangaDex series can be read here, but bookmarks stay limited to local library entries.
+              </p>
+            )}
 
             {resumeChapterId && (
               <button

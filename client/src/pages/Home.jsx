@@ -36,9 +36,14 @@ const Home = () => {
       setLoading(true);
       setError(null);
       try {
-        const { data } = await api.get('/series');
+        const { data } = await api.get('/series', {
+          params: {
+            source: 'mangadex',
+            limit: 12,
+          },
+        });
         if (Array.isArray(data) && data.length > 0) {
-          setFeatured(data.slice(0, 6));
+          setFeatured(data.slice(0, 12));
           setError(null);
         } else {
           console.warn('Expected series list to be a non-empty array, got:', data);
@@ -86,7 +91,7 @@ const Home = () => {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {featured.map((series) => (
                 <SeriesCard key={series._id} series={series} />
               ))}
