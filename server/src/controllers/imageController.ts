@@ -42,6 +42,10 @@ export const proxyImage = async (req: Request, res: Response) => {
       res.setHeader('Content-Type', contentType);
     }
 
+    // These images are intentionally embedded by the separately deployed client.
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
     res.setHeader(
       'Cache-Control',
       cacheControl || 'public, max-age=86400, stale-while-revalidate=604800'

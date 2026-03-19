@@ -44,3 +44,24 @@ export const buildImageCandidates = (src, extraSources = []) => {
 
   return [...new Set(candidatesWithProxyFallbacks)];
 };
+
+export const buildCacheBustedImageSrc = (src, token) => {
+  if (!src || token === undefined || token === null || token === '') {
+    return src || '';
+  }
+
+  try {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+    const parsedUrl = new URL(src, baseUrl);
+    parsedUrl.searchParams.set('mwcb', String(token));
+
+    if (/^https?:\/\//i.test(src) || src.startsWith('/')) {
+      return parsedUrl.toString();
+    }
+
+    return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+  } catch (error) {
+    const separator = src.includes('?') ? '&' : '?';
+    return `${src}${separator}mwcb=${encodeURIComponent(String(token))}`;
+  }
+};

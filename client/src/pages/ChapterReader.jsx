@@ -4,7 +4,7 @@ import api from '../api';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import { getStoredHomePath } from '../utils/navigationState';
-import { buildImageCandidates } from '../utils/images';
+import { buildCacheBustedImageSrc, buildImageCandidates } from '../utils/images';
 
 const ChapterReader = () => {
   const { id } = useParams();
@@ -123,7 +123,11 @@ const ChapterReader = () => {
 
   const handlePageLoad = (pageIndex) => {
     setPageStates((current) => {
-      const existingState = current[pageIndex] || { candidateIndex: 0, status: 'loading' };
+      const existingState = current[pageIndex] || {
+        candidateIndex: 0,
+        requestVersion: 0,
+        status: 'loading',
+      };
 
       if (existingState.status === 'loaded') {
         return current;
@@ -152,7 +156,11 @@ const ChapterReader = () => {
     let pageExhausted = false;
 
     setPageStates((current) => {
-      const existingState = current[pageIndex] || { candidateIndex: 0, status: 'loading' };
+      const existingState = current[pageIndex] || {
+        candidateIndex: 0,
+        requestVersion: 0,
+        status: 'loading',
+      };
       const nextCandidateIndex = existingState.candidateIndex + 1;
 
       if (nextCandidateIndex < pageEntry.candidates.length) {
@@ -160,6 +168,7 @@ const ChapterReader = () => {
           ...current,
           [pageIndex]: {
             candidateIndex: nextCandidateIndex,
+            requestVersion: existingState.requestVersion + 1,
             status: 'retrying',
           },
         };
@@ -186,6 +195,7 @@ const ChapterReader = () => {
       ...current,
       [pageIndex]: {
         candidateIndex: 0,
+        requestVersion: (current[pageIndex]?.requestVersion || 0) + 1,
         status: 'retrying',
       },
     }));
@@ -246,8 +256,16 @@ const ChapterReader = () => {
           {pageEntries.length > 0 ? (
             <>
               {visiblePages.map((page, index) => {
-                const pageState = pageStates[index] || { candidateIndex: 0, status: 'loading' };
-                const activeSrc = page.candidates[pageState.candidateIndex] || '';
+                const pageState = pageStates[index] || {
+                  candidateIndex: 0,
+                  requestVersion: 0,
+                  status: 'loading',
+                };
+                const activeCandidate = page.candidates[pageState.candidateIndex] || '';
+                const activeSrc = buildCacheBustedImageSrc(
+                  activeCandidate,
+                  pageState.requestVersion > 0 ? `${index}-${pageState.requestVersion}` : ''
+                );
                 const isPageFailed = pageState.status === 'failed';
 
                 return (
@@ -275,7 +293,7 @@ const ChapterReader = () => {
                       </div>
                     ) : (
                       <img
-                        key={`${index}:${pageState.candidateIndex}`}
+                        key={`${index}:${pageState.candidateIndex}:${pageState.requestVersion}`}
                         src={activeSrc}
                         alt={`Page ${index + 1}`}
                         className={

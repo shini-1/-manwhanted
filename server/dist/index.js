@@ -30,7 +30,12 @@ const applyCorsHeaders = (req, res) => {
 };
 // Create app
 const app = express();
-app.use(helmet());
+app.use(helmet({
+    // The client and API are deployed on different origins, so the default
+    // same-origin CORP header blocks proxied chapter images from rendering.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginEmbedderPolicy: false,
+}));
 app.use(cors({
     origin: process.env.CLIENT_URL || 'https://manwhanted-client.vercel.app',
     credentials: true,
