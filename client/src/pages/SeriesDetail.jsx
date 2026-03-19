@@ -5,6 +5,7 @@ import { BookmarkContext } from '../context/BookmarkContext';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import { getStoredHomePath } from '../utils/navigationState';
+import { downloadApiFile } from '../utils/downloads';
 import SmartImage from '../SmartImage';
 
 const SeriesDetail = () => {
@@ -14,7 +15,9 @@ const SeriesDetail = () => {
   const [series, setSeries] = useState(null);
   const [resumeChapterId, setResumeChapterId] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [loadError, setLoadError] = useState(null);
+  const [actionError, setActionError] = useState(null);
+  const [activeDownload, setActiveDownload] = useState('');
   const [chapterPage, setChapterPage] = useState(1);
   const isExternalSeries = Boolean(id?.startsWith('md_'));
 
@@ -29,8 +32,33 @@ const SeriesDetail = () => {
       } else {
         await addBookmark(id);
       }
+      setActionError(null);
     } catch (err) {
-      setError('Unable to update bookmarks.');
+      setActionError('Unable to update bookmarks.');
+    }
+  };
+
+  const handleBatchDownload = async (mode) => {
+    if (!id || isExternalSeries) {
+      return;
+    }
+
+    const chapterIds = mode === 'visible' ? visibleChapterIds : [];
+    const path = chapterIds.length > 0
+      ? `/series/${id}/download?chapterIds=${chapterIds.join(',')}`
+      : `/series/${id}/download`;
+    const fallbackFileName = `${series?.title || 'series'} ${mode === 'visible' ? 'visible' : 'batch'}.zip`;
+
+    try {
+      setActiveDownload(mode);
+      setActionError(null);
+      await downloadApiFile(path, fallbackFileName);
+    } catch (err) {
+      setActionError(
+        err?.message || err?.response?.data?.message || 'Unable to download the selected CBZ batch.'
+      );
+    } finally {
+      setActiveDownload('');
     }
   };
 
@@ -38,7 +66,8 @@ const SeriesDetail = () => {
     const loadSeries = async () => {
       if (!id) return;
       setLoading(true);
-      setError(null);
+      setLoadError(null);
+      setActionError(null);
       try {
         const res = await api.get(`/series/${id}`);
         setSeries(res.data);
@@ -49,7 +78,7 @@ const SeriesDetail = () => {
           setResumeChapterId(savedChapter);
         }
       } catch (err) {
-        setError(err?.response?.data?.message || 'Failed to load series.');
+        setLoadError(err?.response?.data?.message || 'Failed to load series.');
       } finally {
         setLoading(false);
       }
@@ -59,7 +88,7 @@ const SeriesDetail = () => {
   }, [id]);
 
   if (loading) return <LoadingSpinner />;
-  if (error) return <ErrorAlert message={error} />;
+  if (loadError) return <ErrorAlert message={loadError} />;
   if (!series) return null;
 
   const chapterCount = Array.isArray(series.chapters) ? series.chapters.length : 0;
@@ -100,36 +129,37 @@ const SeriesDetail = () => {
           </p>
           <p className="text-sm text-gray-500 mb-6">Status: {series.status || 'Unknown'}</p>
           <div className="space-y-3">
-            {!isExternalSeries && (
+            <button
+              className={`simple-button w-full ${isBookmarked() ? 'simple-button-danger' : 'simple-button-primary'}`}
+              onClick={handleBookmarkToggle}
+            >
+              {isBookmarked() ? 'Remove Bookmark' : 'Add to Bookmarks'}
+            </button>
+
+            {!isExternalSeries && chapterCount > 0 && (
               <>
                 <button
-                  className={`simple-button w-full ${isBookmarked() ? 'simple-button-danger' : 'simple-button-primary'}`}
-                  onClick={handleBookmarkToggle}
+                  type="button"
+                  className="simple-button simple-button-success w-full text-center"
+                  onClick={() => handleBatchDownload('visible')}
+                  disabled={activeDownload !== '' || !downloadVisibleHref}
                 >
-                  {isBookmarked() ? 'Remove Bookmark' : 'Add to Bookmarks'}
+                  {activeDownload === 'visible' ? 'Preparing Visible Batch...' : 'Download Visible CBZs'}
                 </button>
-                {chapterCount > 0 && (
-                  <>
-                    <a
-                      href={downloadVisibleHref}
-                      className="simple-button simple-button-success w-full text-center"
-                    >
-                      Download Visible CBZs
-                    </a>
-                    <a
-                      href={downloadAllHref}
-                      className="simple-button simple-button-secondary w-full text-center"
-                    >
-                      Download All CBZs
-                    </a>
-                  </>
-                )}
+                <button
+                  type="button"
+                  className="simple-button simple-button-secondary w-full text-center"
+                  onClick={() => handleBatchDownload('all')}
+                  disabled={activeDownload !== '' || !downloadAllHref}
+                >
+                  {activeDownload === 'all' ? 'Preparing Full Batch...' : 'Download All CBZs'}
+                </button>
               </>
             )}
 
             {isExternalSeries && (
               <p className="text-sm text-gray-500">
-                MangaDex series can be read here, but bookmarks and downloads stay limited to local library entries.
+                MangaDex series can be bookmarked here, but downloads stay limited to local library entries.
               </p>
             )}
 
@@ -140,6 +170,9 @@ const SeriesDetail = () => {
               >
                 Resume Reading
               </button>
+            )}
+            {actionError && (
+              <ErrorAlert message={actionError} />
             )}
           </div>
         </div>

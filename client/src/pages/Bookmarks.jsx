@@ -27,9 +27,18 @@ const Bookmarks = () => {
       setLoading(true);
       setError(null);
       try {
-        const ids = bookmarks.join(',');
-        const res = await api.get(`/series?ids=${ids}`);
-        setSeries(res.data);
+        const resolvedSeries = await Promise.all(
+          bookmarks.map(async (seriesId) => {
+            try {
+              const res = await api.get(`/series/${seriesId}`);
+              return res.data;
+            } catch (seriesError) {
+              return null;
+            }
+          })
+        );
+
+        setSeries(resolvedSeries.filter(Boolean));
       } catch (err) {
         setError(err?.response?.data?.message || 'Failed to load bookmarks.');
       } finally {
