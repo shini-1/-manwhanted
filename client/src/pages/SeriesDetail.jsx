@@ -69,6 +69,13 @@ const SeriesDetail = () => {
     ? series.chapters.slice(chapterStartIndex, chapterStartIndex + CHAPTERS_PER_PAGE)
     : [];
   const homeHref = getStoredHomePath();
+  const visibleChapterIds = visibleChapters.map((chapter) => chapter._id).filter(Boolean);
+  const downloadVisibleHref = !isExternalSeries && visibleChapterIds.length > 0
+    ? buildApiUrl(`/series/${id}/download?chapterIds=${visibleChapterIds.join(',')}`)
+    : '';
+  const downloadAllHref = !isExternalSeries && chapterCount > 0
+    ? buildApiUrl(`/series/${id}/download`)
+    : '';
 
   return (
     <div className="container mx-auto p-8">
@@ -94,17 +101,35 @@ const SeriesDetail = () => {
           <p className="text-sm text-gray-500 mb-6">Status: {series.status || 'Unknown'}</p>
           <div className="space-y-3">
             {!isExternalSeries && (
-              <button
-                className={`simple-button w-full ${isBookmarked() ? 'simple-button-danger' : 'simple-button-primary'}`}
-                onClick={handleBookmarkToggle}
-              >
-                {isBookmarked() ? 'Remove Bookmark' : 'Add to Bookmarks'}
-              </button>
+              <>
+                <button
+                  className={`simple-button w-full ${isBookmarked() ? 'simple-button-danger' : 'simple-button-primary'}`}
+                  onClick={handleBookmarkToggle}
+                >
+                  {isBookmarked() ? 'Remove Bookmark' : 'Add to Bookmarks'}
+                </button>
+                {chapterCount > 0 && (
+                  <>
+                    <a
+                      href={downloadVisibleHref}
+                      className="simple-button simple-button-success w-full text-center"
+                    >
+                      Download Visible CBZs
+                    </a>
+                    <a
+                      href={downloadAllHref}
+                      className="simple-button simple-button-secondary w-full text-center"
+                    >
+                      Download All CBZs
+                    </a>
+                  </>
+                )}
+              </>
             )}
 
             {isExternalSeries && (
               <p className="text-sm text-gray-500">
-                MangaDex series can be read here, but bookmarks stay limited to local library entries.
+                MangaDex series can be read here, but bookmarks and downloads stay limited to local library entries.
               </p>
             )}
 
@@ -159,17 +184,17 @@ const SeriesDetail = () => {
                     <p className="font-semibold">{chapter.title}</p>
                     <p className="text-sm text-gray-500">Chapter {chapter.number}</p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
                     <Link
                       to={`/read/${chapter._id}`}
-                      className="simple-button simple-button-primary"
+                      className="simple-button simple-button-primary flex-1 sm:flex-none"
                     >
                       Read
                     </Link>
                     {!isExternalSeries && (
                       <a
                         href={buildApiUrl(`/chapters/${chapter._id}/download`)}
-                        className="simple-button simple-button-success"
+                        className="simple-button simple-button-success flex-1 sm:flex-none"
                       >
                         Download CBZ
                       </a>

@@ -1,9 +1,10 @@
 import axios from 'axios';
 import archiver from 'archiver';
+import Series from '../models/series.js';
 import Chapter from '../models/chapter.js';
 import { ensureDatabaseConnection } from '../services/database.js';
 import { mangadexService } from '../services/mangadex.service.js';
-import { getFallbackChapterById } from '../services/fallbackCatalog.js';
+import { getFallbackChapterById, getFallbackSeriesWithPages, } from '../services/fallbackCatalog.js';
 const CONTENT_TYPE_EXTENSIONS = {
     'image/jpeg': 'jpg',
     'image/png': 'png',
@@ -55,6 +56,108 @@ const resolveChapterForDownload = async (chapterId) => {
     }
     return getFallbackChapterById(chapterId);
 };
+const normalizeRequestedChapterIds = (value) => typeof value === 'string'
+    ? value.split(',').map((entry) => entry.trim()).filter(Boolean)
+    : [];
+const parseChapterNumber = (value) => {
+    if (typeof value !== 'string') {
+        return Number.POSITIVE_INFINITY;
+    }
+    const normalizedValue = value.replace(/[^0-9.]/g, '');
+    const parsedValue = Number.parseFloat(normalizedValue);
+    return Number.isFinite(parsedValue) ? parsedValue : Number.POSITIVE_INFINITY;
+};
+const sortChaptersForDownload = (chapters) => [...chapters].sort((left, right) => {
+    const numericDifference = parseChapterNumber(left.number) - parseChapterNumber(right.number);
+    if (Number.isFinite(numericDifference) && numericDifference !== 0) {
+        return numericDifference;
+    }
+    return `${left.title || ''}`.localeCompare(`${right.title || ''}`);
+});
+const fetchPageFile = async (pageUrl, index) => {
+    const response = await axios.get(pageUrl, {
+        responseType: 'arraybuffer',
+        timeout: 30000,
+        headers: {
+            Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (compatible; Manwhanted/1.0)',
+            Referer: (() => {
+                try {
+                    return `${new URL(pageUrl).origin}/`;
+                }
+                catch (error) {
+                    return undefined;
+                }
+            })(),
+        },
+    });
+    const extension = resolveFileExtension(pageUrl, response.headers['content-type']);
+    return {
+        name: `${String(index + 1).padStart(3, '0')}.${extension}`,
+        data: Buffer.from(response.data),
+    };
+};
+const buildChapterCbzBuffer = async (chapter) => {
+    const pageUrls = Array.isArray(chapter.pages)
+        ? chapter.pages.filter((page) => typeof page === 'string' && page.trim().length > 0)
+        : [];
+    if (pageUrls.length === 0) {
+        throw new Error('This chapter has no downloadable pages.');
+    }
+    const pageFiles = await Promise.all(pageUrls.map((pageUrl, index) => fetchPageFile(pageUrl, index)));
+    return new Promise((resolve, reject) => {
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        const chunks = [];
+        const chapterLabel = sanitizeFileName(`${chapter.title || 'Chapter'} ${chapter.number || ''}`);
+        archive.on('data', (chunk) => {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+        archive.on('error', reject);
+        archive.on('end', () => {
+            resolve({
+                fileName: `${chapterLabel}.cbz`,
+                buffer: Buffer.concat(chunks),
+            });
+        });
+        for (const pageFile of pageFiles) {
+            archive.append(pageFile.data, { name: pageFile.name });
+        }
+        archive.finalize().catch(reject);
+    });
+};
+const resolveSeriesForBatchDownload = async (seriesId, requestedChapterIds) => {
+    if (mangadexService.isMangaDexSeriesId(seriesId)) {
+        return null;
+    }
+    try {
+        await ensureDatabaseConnection();
+        const series = await Series.findById(seriesId).lean();
+        if (series) {
+            const chapterFilter = requestedChapterIds.length > 0
+                ? { series: seriesId, _id: { $in: requestedChapterIds } }
+                : { series: seriesId };
+            const chapters = await Chapter.find(chapterFilter).lean();
+            return {
+                title: series.title || 'Series',
+                chapters: sortChaptersForDownload(chapters),
+            };
+        }
+    }
+    catch (error) {
+        console.error('Batch series database lookup failed:', error);
+    }
+    const fallbackSeries = getFallbackSeriesWithPages(seriesId);
+    if (!fallbackSeries) {
+        return null;
+    }
+    const chapters = requestedChapterIds.length > 0
+        ? fallbackSeries.chapters.filter((chapter) => requestedChapterIds.includes(chapter._id))
+        : fallbackSeries.chapters;
+    return {
+        title: fallbackSeries.title || 'Series',
+        chapters: sortChaptersForDownload(chapters),
+    };
+};
 export const downloadLocalChapter = async (req, res) => {
     const { id } = req.params;
     if (mangadexService.isMangaDexChapterId(id)) {
@@ -66,58 +169,56 @@ export const downloadLocalChapter = async (req, res) => {
     if (!chapter) {
         return res.status(404).json({ message: 'Chapter not found.' });
     }
-    const pageUrls = Array.isArray(chapter.pages)
-        ? chapter.pages.filter((page) => typeof page === 'string' && page.trim().length > 0)
-        : [];
-    if (pageUrls.length === 0) {
-        return res.status(400).json({ message: 'This chapter has no downloadable pages.' });
+    try {
+        const { fileName, buffer } = await buildChapterCbzBuffer(chapter);
+        res.setHeader('Content-Type', 'application/vnd.comicbook+zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Cache-Control', 'private, no-store');
+        return res.send(buffer);
+    }
+    catch (error) {
+        console.error('Download chapter error:', error);
+        return res.status(502).json({ message: 'Failed to download one or more chapter pages.' });
+    }
+};
+export const downloadSeriesChapterBatch = async (req, res) => {
+    const { id } = req.params;
+    const requestedChapterIds = normalizeRequestedChapterIds(req.query.chapterIds);
+    if (mangadexService.isMangaDexSeriesId(id)) {
+        return res.status(403).json({
+            message: 'Batch downloads are only available for local library series.',
+        });
+    }
+    const series = await resolveSeriesForBatchDownload(id, requestedChapterIds);
+    if (!series) {
+        return res.status(404).json({ message: 'Series not found.' });
+    }
+    if (!Array.isArray(series.chapters) || series.chapters.length === 0) {
+        return res.status(400).json({ message: 'No chapters are available to download.' });
     }
     try {
-        const pageFiles = await Promise.all(pageUrls.map(async (pageUrl, index) => {
-            const response = await axios.get(pageUrl, {
-                responseType: 'arraybuffer',
-                timeout: 30000,
-                headers: {
-                    Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-                    'User-Agent': 'Mozilla/5.0 (compatible; Manwhanted/1.0)',
-                    Referer: (() => {
-                        try {
-                            return `${new URL(pageUrl).origin}/`;
-                        }
-                        catch (error) {
-                            return undefined;
-                        }
-                    })(),
-                },
-            });
-            const extension = resolveFileExtension(pageUrl, response.headers['content-type']);
-            return {
-                name: `${String(index + 1).padStart(3, '0')}.${extension}`,
-                data: Buffer.from(response.data),
-            };
-        }));
-        const chapterLabel = sanitizeFileName(`${chapter.title || 'Chapter'} ${chapter.number || ''}`);
-        const archiveFileName = `${chapterLabel}.cbz`;
-        res.setHeader('Content-Type', 'application/vnd.comicbook+zip');
+        const archiveFileName = `${sanitizeFileName(series.title || 'Series')} Batch.zip`;
+        res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename="${archiveFileName}"`);
         res.setHeader('Cache-Control', 'private, no-store');
         const archive = archiver('zip', { zlib: { level: 9 } });
         archive.on('error', (error) => {
-            console.error('Chapter archive error:', error);
+            console.error('Series batch archive error:', error);
             if (!res.headersSent) {
-                res.status(500).json({ message: 'Failed to create chapter archive.' });
+                res.status(500).json({ message: 'Failed to create batch archive.' });
                 return;
             }
             res.end();
         });
         archive.pipe(res);
-        for (const pageFile of pageFiles) {
-            archive.append(pageFile.data, { name: pageFile.name });
+        for (const chapter of series.chapters) {
+            const { fileName, buffer } = await buildChapterCbzBuffer(chapter);
+            archive.append(buffer, { name: fileName });
         }
         await archive.finalize();
     }
     catch (error) {
-        console.error('Download chapter error:', error);
-        return res.status(502).json({ message: 'Failed to download one or more chapter pages.' });
+        console.error('Batch download error:', error);
+        return res.status(502).json({ message: 'Failed to build the chapter batch download.' });
     }
 };

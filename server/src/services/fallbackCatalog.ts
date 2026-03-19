@@ -111,3 +111,6 @@ export const getFallbackSeriesChapters = (seriesId: string) => {
 
 export const getFallbackChapterById = (id: string) =>
   fallbackCatalog.flatMap((series) => series.chapters).find((chapter) => chapter._id === id) || null;
+
+export const getFallbackSeriesWithPages = (id: string) =>
+  fallbackCatalog.find((entry) => entry._id === id) || null;

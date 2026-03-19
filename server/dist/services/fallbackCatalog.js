@@ -85,3 +85,4 @@ export const getFallbackSeriesChapters = (seriesId) => {
     }));
 };
 export const getFallbackChapterById = (id) => fallbackCatalog.flatMap((series) => series.chapters).find((chapter) => chapter._id === id) || null;
+export const getFallbackSeriesWithPages = (id) => fallbackCatalog.find((entry) => entry._id === id) || null;
