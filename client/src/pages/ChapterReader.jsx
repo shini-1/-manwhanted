@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api from '../api';
+import api, { buildApiUrl } from '../api';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import { getStoredHomePath } from '../utils/navigationState';
@@ -59,6 +59,10 @@ const ChapterReader = () => {
   const nextChapterId = chapterIndex >= 0 && series?.chapters?.length
     ? series.chapters?.[chapterIndex + 1]?._id
     : null;
+  const downloadConfig = chapter.download || { enabled: false };
+  const downloadHref = downloadConfig.enabled && downloadConfig.url
+    ? buildApiUrl(downloadConfig.url)
+    : '';
   const pageUrls = Array.isArray(chapter.pages) ? chapter.pages : [];
   const rawPageSources = Array.isArray(chapter.pageSources) && chapter.pageSources.length > 0
     ? chapter.pageSources
@@ -221,13 +225,27 @@ const ChapterReader = () => {
               <h1 className="text-2xl font-bold">{chapter.title}</h1>
               <span className="text-gray-500">Chapter {chapter.number}</span>
             </div>
-            <button
-              type="button"
-              className={`reader-mode-toggle ${mobileReaderMode ? 'reader-mode-toggle-active' : ''}`}
-              onClick={() => setMobileReaderMode((current) => !current)}
-            >
-              {mobileReaderMode ? 'Exit Mobile Fit' : 'Mobile Fit 50%'}
-            </button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+              <button
+                type="button"
+                className={`reader-mode-toggle ${mobileReaderMode ? 'reader-mode-toggle-active' : ''}`}
+                onClick={() => setMobileReaderMode((current) => !current)}
+              >
+                {mobileReaderMode ? 'Exit Mobile Fit' : 'Mobile Fit 50%'}
+              </button>
+              {downloadConfig.enabled ? (
+                <a
+                  href={downloadHref}
+                  className="w-full rounded-full bg-emerald-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg transition hover:bg-emerald-500 sm:w-auto"
+                >
+                  Download Chapter
+                </a>
+              ) : (
+                <span className="text-xs text-gray-400 sm:max-w-xs">
+                  {downloadConfig.reason || 'Download unavailable for this chapter.'}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className={mobileReaderMode ? 'space-y-4' : 'space-y-6'}>

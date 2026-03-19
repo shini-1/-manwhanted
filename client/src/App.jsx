@@ -7,6 +7,7 @@ import Announcements from './pages/Announcements';
 import SeriesDetail from './pages/SeriesDetail';
 import ChapterReader from './pages/ChapterReader';
 import Bookmarks from './pages/Bookmarks';
+import OfflineReader from './pages/OfflineReader';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/announcements" element={<Announcements />} />
             <Route path="/series/:id" element={<SeriesDetail />} />
             <Route path="/read/:id" element={<ChapterReader />} />
+            <Route path="/offline-reader" element={<OfflineReader />} />
             <Route path="/bookmarks" element={<Bookmarks />} />
           </Routes>
         </main>

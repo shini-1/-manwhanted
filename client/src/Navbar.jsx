@@ -14,6 +14,7 @@ export default function Navbar() {
       <div className="flex flex-wrap gap-x-4 gap-y-2 items-center text-sm sm:text-base">
         <Link to={homeHref}>Home</Link>
         <Link to="/browse">Browse</Link>
+        <Link to="/offline-reader">Offline Reader</Link>
         <Link to="/announcements">Announcements</Link>
         <Link to="/bookmarks" className="flex items-center gap-1">
           <span className="hidden sm:inline">Bookmarks</span>

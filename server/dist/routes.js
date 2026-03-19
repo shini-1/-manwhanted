@@ -3,6 +3,7 @@ import { getSeriesFilters, listSeries, getSeriesById, getSeriesChapters, getChap
 import { logError } from './controllers/logController.js';
 import { importPopular } from './controllers/mangadex.controller.js';
 import { proxyImage } from './controllers/imageController.js';
+import { downloadLocalChapter } from './controllers/downloadController.js';
 const router = express.Router();
 // Health check
 router.get('/', (req, res) => {
@@ -18,5 +19,6 @@ router.get('/series', listSeries);
 router.get('/series/filters', getSeriesFilters);
 router.get('/series/:id', getSeriesById);
 router.get('/series/:id/chapters', getSeriesChapters);
+router.get('/chapters/:id/download', downloadLocalChapter);
 router.get('/chapters/:id', getChapterById);
 export default router;

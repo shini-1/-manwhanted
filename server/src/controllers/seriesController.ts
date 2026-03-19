@@ -23,6 +23,18 @@ const normalizeStringList = (value: unknown) =>
         .filter(Boolean)
     : [];
 
+const normalizeIdentifier = (value: unknown) => {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+
+  if (value && typeof value === 'object' && 'toString' in value) {
+    return String((value as { toString: () => string }).toString());
+  }
+
+  return '';
+};
+
 const formatSeriesResponse = <T extends Record<string, unknown>>(series: T) => {
   const normalizedSeries = toPlainObject(series);
   const coverImage = typeof normalizedSeries.coverImage === 'string'
@@ -41,6 +53,7 @@ const formatSeriesResponse = <T extends Record<string, unknown>>(series: T) => {
 
 const formatChapterResponse = <T extends Record<string, unknown>>(chapter: T) => {
   const normalizedChapter = toPlainObject(chapter);
+  const chapterId = normalizeIdentifier(normalizedChapter._id);
   const rawPageSources = Array.isArray(normalizedChapter.pageSources)
     ? normalizedChapter.pageSources
     : [];
@@ -89,6 +102,17 @@ const formatChapterResponse = <T extends Record<string, unknown>>(chapter: T) =>
     pages,
     pageSources,
     previewImage,
+    download: chapterId && !mangadexService.isMangaDexChapterId(chapterId)
+      ? {
+          enabled: true,
+          url: `/chapters/${chapterId}/download`,
+          label: 'Download Chapter',
+          format: 'cbz',
+        }
+      : {
+          enabled: false,
+          reason: 'Downloads are limited to local library chapters.',
+        },
   };
 };
 

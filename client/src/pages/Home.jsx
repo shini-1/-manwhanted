@@ -307,6 +307,24 @@ const Home = () => {
       <h1 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-100">Welcome to Manwhanted</h1>
       <p className="text-base sm:text-xl mb-8 sm:mb-12 text-gray-300">Your premier destination for manhwa and manga.</p>
 
+      <section className="mb-8 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-emerald-100">Offline Reader</h2>
+            <p className="mt-2 max-w-2xl text-sm text-emerald-50/85">
+              Open a downloaded CBZ from your phone or computer and read it directly in the web app.
+              The file stays on your device and your progress is saved locally.
+            </p>
+          </div>
+          <Link
+            to="/offline-reader"
+            className="rounded-full bg-emerald-500 px-5 py-3 text-center text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
+          >
+            Open Offline Reader
+          </Link>
+        </div>
+      </section>
+
       {(resumeLoading || resumeItems.length > 0) && (
         <section className="mb-8 rounded-xl border border-gray-700 bg-gray-800/70 p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between">
@@ -330,14 +348,16 @@ const Home = () => {
                   to={`/read/${item.chapterId}`}
                   className="rounded-lg bg-gray-900 border border-gray-700 overflow-hidden hover:border-blue-500 transition"
                 >
-                  <SmartImage
-                    src={item.seriesThumbnail || item.seriesCover}
-                    sources={[item.seriesCover, item.chapterPreview].filter(Boolean)}
-                    fallbackSrc={`https://placehold.co/500x750/111827/f9fafb?text=${encodeURIComponent(item.seriesTitle || 'Resume')}`}
-                    alt={item.seriesTitle}
-                    className="w-full h-36 object-cover"
-                    loading="lazy"
-                  />
+                  <div className="flex h-40 items-center justify-center border-b border-gray-800 bg-slate-950/90 p-3">
+                    <SmartImage
+                      src={item.seriesThumbnail || item.seriesCover}
+                      sources={[item.seriesCover, item.chapterPreview].filter(Boolean)}
+                      fallbackSrc={`https://placehold.co/500x750/111827/f9fafb?text=${encodeURIComponent(item.seriesTitle || 'Resume')}`}
+                      alt={item.seriesTitle}
+                      className="h-full w-full object-contain"
+                      loading="lazy"
+                    />
+                  </div>
                   <div className="p-3">
                     <p className="text-sm font-semibold text-gray-100 line-clamp-2">{item.seriesTitle}</p>
                     <p className="text-xs text-gray-400 mt-1">

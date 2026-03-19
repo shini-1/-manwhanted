@@ -8,18 +8,27 @@ export default function SeriesCard({ series }) {
   return (
     <Link
       to={`/series/${series._id}`}
-      className="bg-gray-700 p-4 rounded hover:shadow-lg transition"
+      className="rounded-lg border border-gray-700 bg-gray-900 overflow-hidden transition hover:border-blue-500"
     >
-      <SmartImage
-        src={series.thumbnailImage || series.coverImage}
-        sources={series.coverImage ? [series.coverImage] : []}
-        fallbackSrc={fallbackCover}
-        alt={series.title}
-        className="w-full h-48 object-cover rounded"
-        loading="lazy"
-      />
-      <h3 className="mt-2 text-lg font-semibold">{series.title}</h3>
-      <p className="text-sm text-gray-300">{series.status || 'Unknown status'}</p>
+      <div className="flex h-44 items-center justify-center border-b border-gray-800 bg-slate-950/90 p-3">
+        <SmartImage
+          src={series.thumbnailImage || series.coverImage}
+          sources={series.coverImage ? [series.coverImage] : []}
+          fallbackSrc={fallbackCover}
+          alt={series.title}
+          className="h-full w-full object-contain"
+          loading="lazy"
+        />
+      </div>
+      <div className="p-3">
+        <p className="text-sm font-semibold text-gray-100 line-clamp-2">{series.title}</p>
+        <p className="mt-1 text-xs text-gray-400">{series.status || 'Unknown status'}</p>
+        {Array.isArray(series.genres) && series.genres.length > 0 && (
+          <p className="mt-1 text-xs text-gray-500 line-clamp-1">
+            {series.genres.join(', ')}
+          </p>
+        )}
+      </div>
     </Link>
   );
 }
