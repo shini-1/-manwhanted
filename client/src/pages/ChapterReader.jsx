@@ -1,18 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api, { buildApiUrl } from '../api';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
+import { BookmarkContext } from '../context/BookmarkContext';
 import { getStoredHomePath } from '../utils/navigationState';
 import { buildCacheBustedImageSrc, buildImageCandidates } from '../utils/images';
 
 const ChapterReader = () => {
   const { id } = useParams();
+  const { bookmarks, addBookmark, removeBookmark } = useContext(BookmarkContext);
   const [chapter, setChapter] = useState(null);
   const [series, setSeries] = useState(null);
   const [chapterIndex, setChapterIndex] = useState(-1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionError, setActionError] = useState(null);
   const [visiblePageCount, setVisiblePageCount] = useState(1);
   const [pageStates, setPageStates] = useState({});
   const [mobileReaderMode, setMobileReaderMode] = useState(false);
@@ -22,6 +25,7 @@ const ChapterReader = () => {
       if (!id) return;
       setLoading(true);
       setError(null);
+      setActionError(null);
       setVisiblePageCount(1);
       setPageStates({});
 
@@ -59,6 +63,9 @@ const ChapterReader = () => {
   const nextChapterId = chapterIndex >= 0 && series?.chapters?.length
     ? series.chapters?.[chapterIndex + 1]?._id
     : null;
+  const seriesId = typeof chapter.series === 'string' ? chapter.series : '';
+  const isExternalSeries = Boolean(seriesId?.startsWith('md_'));
+  const isBookmarked = Array.isArray(bookmarks) && bookmarks.includes(seriesId);
   const downloadConfig = chapter.download || { enabled: false };
   const downloadHref = downloadConfig.enabled && downloadConfig.url
     ? buildApiUrl(downloadConfig.url)
@@ -95,6 +102,23 @@ const ChapterReader = () => {
   const chapterHeading = chapter.title && /^chapter\b/i.test(chapter.title.trim())
     ? chapter.title.trim()
     : `Chapter ${chapter.number}`;
+
+  const handleBookmarkToggle = async () => {
+    if (!seriesId || isExternalSeries) {
+      return;
+    }
+
+    try {
+      if (isBookmarked) {
+        await removeBookmark(seriesId);
+      } else {
+        await addBookmark(seriesId);
+      }
+      setActionError(null);
+    } catch (err) {
+      setActionError('Unable to update bookmarks for this series.');
+    }
+  };
 
   const revealNextPage = (pageIndex) => {
     setVisiblePageCount((current) => {
@@ -235,6 +259,15 @@ const ChapterReader = () => {
               >
                 {mobileReaderMode ? 'Exit Mobile Fit' : 'Mobile Fit'}
               </button>
+              {!isExternalSeries && (
+                <button
+                  type="button"
+                  className={`simple-button w-full sm:w-auto ${isBookmarked ? 'simple-button-danger' : 'simple-button-primary'}`}
+                  onClick={handleBookmarkToggle}
+                >
+                  {isBookmarked ? 'Remove Bookmark' : 'Add to Bookmarks'}
+                </button>
+              )}
               {downloadConfig.enabled ? (
                 <a
                   href={downloadHref}
@@ -243,9 +276,22 @@ const ChapterReader = () => {
                   Download CBZ
                 </a>
               ) : (
-                <span className="text-xs text-gray-400 sm:max-w-xs">
-                  {downloadConfig.reason || 'Download unavailable for this chapter.'}
-                </span>
+                <>
+                  <button
+                    type="button"
+                    className="simple-button simple-button-disabled w-full sm:w-auto"
+                    disabled
+                    title={downloadConfig.reason || 'Download unavailable for this chapter.'}
+                  >
+                    Download CBZ
+                  </button>
+                  <span className="text-xs text-gray-400 sm:max-w-xs">
+                    {downloadConfig.reason || 'Download unavailable for this chapter.'}
+                  </span>
+                </>
+              )}
+              {actionError && (
+                <span className="text-xs text-red-400 sm:max-w-xs">{actionError}</span>
               )}
             </div>
           </div>
