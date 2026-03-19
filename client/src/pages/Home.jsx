@@ -5,6 +5,7 @@ import SeriesCard from '../SeriesCard';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import { buildPathWithSearch, setStoredHomePath } from '../utils/navigationState';
+import SmartImage from '../SmartImage';
 const MAX_VISIBLE_TAGS = 24;
 const HOME_PAGE_SIZE = 12;
 const LAST_READ_PREFIX = 'manwhanted:lastRead:';
@@ -126,6 +127,8 @@ const Home = () => {
               ...entry,
               seriesTitle: seriesRes.data?.title || 'Unknown series',
               seriesCover: seriesRes.data?.coverImage || '',
+              seriesThumbnail: seriesRes.data?.thumbnailImage || seriesRes.data?.coverImage || '',
+              chapterPreview: chapterRes.data?.previewImage || '',
               chapterTitle: chapterRes.data?.title || '',
               chapterNumber: chapterRes.data?.number || '?',
             };
@@ -327,8 +330,10 @@ const Home = () => {
                   to={`/read/${item.chapterId}`}
                   className="rounded-lg bg-gray-900 border border-gray-700 overflow-hidden hover:border-blue-500 transition"
                 >
-                  <img
-                    src={item.seriesCover || 'https://via.placeholder.com/500x750'}
+                  <SmartImage
+                    src={item.seriesThumbnail || item.seriesCover}
+                    sources={[item.seriesCover, item.chapterPreview].filter(Boolean)}
+                    fallbackSrc={`https://placehold.co/500x750/111827/f9fafb?text=${encodeURIComponent(item.seriesTitle || 'Resume')}`}
                     alt={item.seriesTitle}
                     className="w-full h-36 object-cover"
                     loading="lazy"

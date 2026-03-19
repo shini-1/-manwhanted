@@ -2,6 +2,7 @@ import express from 'express';
 import { getSeriesFilters, listSeries, getSeriesById, getSeriesChapters, getChapterById, } from './controllers/seriesController.js';
 import { logError } from './controllers/logController.js';
 import { importPopular } from './controllers/mangadex.controller.js';
+import { proxyImage } from './controllers/imageController.js';
 const router = express.Router();
 // Health check
 router.get('/', (req, res) => {
@@ -9,6 +10,7 @@ router.get('/', (req, res) => {
 });
 // Client-side logging
 router.post('/logs', logError);
+router.get('/images/proxy', proxyImage);
 // MangaDex admin
 router.post('/admin/import-popular', importPopular);
 // Series / chapters

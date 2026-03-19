@@ -4,6 +4,7 @@ import api from '../api';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import { getStoredHomePath } from '../utils/navigationState';
+import { buildImageCandidates } from '../utils/images';
 
 const ChapterReader = () => {
   const { id } = useParams();
@@ -13,6 +14,14 @@ const ChapterReader = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [visiblePageCount, setVisiblePageCount] = useState(1);
+  const [pageStates, setPageStates] = useState({});
+  const [mobileReaderMode, setMobileReaderMode] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem('manwhanted:readerMode') === 'mobile-fit';
+  });
 
   useEffect(() => {
     const loadChapter = async () => {
@@ -20,6 +29,7 @@ const ChapterReader = () => {
       setLoading(true);
       setError(null);
       setVisiblePageCount(1);
+      setPageStates({});
 
       try {
         const res = await api.get(`/chapters/${id}`);
@@ -47,6 +57,22 @@ const ChapterReader = () => {
     loadChapter();
   }, [id]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    window.localStorage.setItem(
+      'manwhanted:readerMode',
+      mobileReaderMode ? 'mobile-fit' : 'default'
+    );
+    document.body.classList.toggle('reader-mobile-fit-active', mobileReaderMode);
+
+    return () => {
+      document.body.classList.remove('reader-mobile-fit-active');
+    };
+  }, [mobileReaderMode]);
+
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorAlert message={error} />;
   if (!chapter) return null;
@@ -56,7 +82,33 @@ const ChapterReader = () => {
     ? series.chapters?.[chapterIndex + 1]?._id
     : null;
   const pageUrls = Array.isArray(chapter.pages) ? chapter.pages : [];
-  const visiblePages = pageUrls.slice(0, visiblePageCount);
+  const rawPageSources = Array.isArray(chapter.pageSources) && chapter.pageSources.length > 0
+    ? chapter.pageSources
+    : pageUrls.map((pageUrl) => ({ url: pageUrl, candidates: [pageUrl] }));
+  const pageEntries = rawPageSources
+    .map((pageSource) => {
+      if (!pageSource) {
+        return null;
+      }
+
+      const sourceUrl = typeof pageSource === 'string' ? pageSource : pageSource.url;
+      const sourceCandidates =
+        typeof pageSource === 'object' && Array.isArray(pageSource?.candidates)
+          ? pageSource.candidates
+          : [];
+      const candidates = buildImageCandidates(sourceUrl, sourceCandidates);
+
+      if (candidates.length === 0) {
+        return null;
+      }
+
+      return {
+        url: sourceUrl || candidates[0],
+        candidates,
+      };
+    })
+    .filter(Boolean);
+  const visiblePages = pageEntries.slice(0, visiblePageCount);
   const homeHref = getStoredHomePath();
 
   const revealNextPage = (pageIndex) => {
@@ -65,8 +117,78 @@ const ChapterReader = () => {
         return current;
       }
 
-      return Math.min(current + 1, pageUrls.length);
+      return Math.min(current + 1, pageEntries.length);
     });
+  };
+
+  const handlePageLoad = (pageIndex) => {
+    setPageStates((current) => {
+      const existingState = current[pageIndex] || { candidateIndex: 0, status: 'loading' };
+
+      if (existingState.status === 'loaded') {
+        return current;
+      }
+
+      return {
+        ...current,
+        [pageIndex]: {
+          ...existingState,
+          status: 'loaded',
+        },
+      };
+    });
+
+    revealNextPage(pageIndex);
+  };
+
+  const handlePageError = (pageIndex) => {
+    const pageEntry = pageEntries[pageIndex];
+
+    if (!pageEntry) {
+      revealNextPage(pageIndex);
+      return;
+    }
+
+    let pageExhausted = false;
+
+    setPageStates((current) => {
+      const existingState = current[pageIndex] || { candidateIndex: 0, status: 'loading' };
+      const nextCandidateIndex = existingState.candidateIndex + 1;
+
+      if (nextCandidateIndex < pageEntry.candidates.length) {
+        return {
+          ...current,
+          [pageIndex]: {
+            candidateIndex: nextCandidateIndex,
+            status: 'retrying',
+          },
+        };
+      }
+
+      pageExhausted = true;
+
+      return {
+        ...current,
+        [pageIndex]: {
+          ...existingState,
+          status: 'failed',
+        },
+      };
+    });
+
+    if (pageExhausted) {
+      revealNextPage(pageIndex);
+    }
+  };
+
+  const retryPage = (pageIndex) => {
+    setPageStates((current) => ({
+      ...current,
+      [pageIndex]: {
+        candidateIndex: 0,
+        status: 'retrying',
+      },
+    }));
   };
 
   const chapterNavigation = (
@@ -95,47 +217,94 @@ const ChapterReader = () => {
   );
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
-      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <Link to={homeHref} className="text-blue-600 hover:underline">
-            Back to home results
-          </Link>
-          <Link to={`/series/${chapter.series}`} className="text-blue-600 hover:underline">
-            Back to series
-          </Link>
+    <div className={`mx-auto p-4 ${mobileReaderMode ? 'reader-mobile-fit-shell' : 'max-w-4xl'}`}>
+      <div className={mobileReaderMode ? 'reader-mobile-stage' : ''}>
+        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <Link to={homeHref} className="text-blue-600 hover:underline">
+              Back to home results
+            </Link>
+            <Link to={`/series/${chapter.series}`} className="text-blue-600 hover:underline">
+              Back to series
+            </Link>
+          </div>
+          <div className="flex flex-col gap-3 text-left sm:items-end sm:text-right">
+            <div>
+              <h1 className="text-2xl font-bold">{chapter.title}</h1>
+              <span className="text-gray-500">Chapter {chapter.number}</span>
+            </div>
+            <button
+              type="button"
+              className={`reader-mode-toggle ${mobileReaderMode ? 'reader-mode-toggle-active' : ''}`}
+              onClick={() => setMobileReaderMode((current) => !current)}
+            >
+              {mobileReaderMode ? 'Exit Mobile Fit' : 'Mobile Fit 50%'}
+            </button>
+          </div>
         </div>
-        <div className="text-left sm:text-right">
-          <h1 className="text-2xl font-bold">{chapter.title}</h1>
-          <span className="text-gray-500">Chapter {chapter.number}</span>
+        <div className={mobileReaderMode ? 'space-y-4' : 'space-y-6'}>
+          {pageEntries.length > 0 ? (
+            <>
+              {visiblePages.map((page, index) => {
+                const pageState = pageStates[index] || { candidateIndex: 0, status: 'loading' };
+                const activeSrc = page.candidates[pageState.candidateIndex] || '';
+                const isPageFailed = pageState.status === 'failed';
+
+                return (
+                  <div
+                    key={`${index}:${page.url}`}
+                    className={
+                      mobileReaderMode
+                        ? 'reader-mobile-page'
+                        : 'bg-white shadow-lg rounded-lg p-4'
+                    }
+                  >
+                    {isPageFailed ? (
+                      <div className="rounded-lg border border-red-900 bg-red-950/40 px-4 py-6 text-center text-sm text-red-100">
+                        <p className="font-semibold">Page {index + 1} could not be loaded.</p>
+                        <p className="mt-2 text-red-200">
+                          The reader skipped ahead so the chapter keeps moving.
+                        </p>
+                        <button
+                          type="button"
+                          className="mt-4 rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-500"
+                          onClick={() => retryPage(index)}
+                        >
+                          Retry page
+                        </button>
+                      </div>
+                    ) : (
+                      <img
+                        key={`${index}:${pageState.candidateIndex}`}
+                        src={activeSrc}
+                        alt={`Page ${index + 1}`}
+                        className={
+                          mobileReaderMode
+                            ? 'reader-mobile-image'
+                            : 'w-full h-auto rounded-lg'
+                        }
+                        loading={index === 0 ? 'eager' : 'lazy'}
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                        onLoad={() => handlePageLoad(index)}
+                        onError={() => handlePageError(index)}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+              {visiblePageCount < pageEntries.length && (
+                <div className="rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-center text-sm text-gray-300">
+                  Loading page {visiblePageCount + 1} of {pageEntries.length}...
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-gray-500">No pages available for this chapter.</p>
+          )}
         </div>
+        {chapterNavigation}
       </div>
-      <div className="space-y-6">
-        {pageUrls.length > 0 ? (
-          <>
-            {visiblePages.map((pageUrl, index) => (
-              <div key={index} className="bg-white shadow-lg rounded-lg p-4">
-                <img
-                  src={pageUrl}
-                  alt={`Page ${index + 1}`}
-                  className="w-full h-auto rounded-lg"
-                  loading={index === 0 ? 'eager' : 'lazy'}
-                  onLoad={() => revealNextPage(index)}
-                  onError={() => revealNextPage(index)}
-                />
-              </div>
-            ))}
-            {visiblePageCount < pageUrls.length && (
-              <div className="rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-center text-sm text-gray-300">
-                Loading page {visiblePageCount + 1} of {pageUrls.length}...
-              </div>
-            )}
-          </>
-        ) : (
-          <p className="text-gray-500">No pages available for this chapter.</p>
-        )}
-      </div>
-      {chapterNavigation}
     </div>
   );
 };

@@ -27,8 +27,8 @@ interface MangaDexManga {
   relationships: Array<{
     type: string;
     id: string;
-    attributes: {
-      fileName: string;
+    attributes?: {
+      fileName?: string;
     };
   }>;
 }
@@ -163,6 +163,12 @@ class MangaDexService {
 
   private toChapterId(chapterId: string): string {
     return `${MANGADEX_CHAPTER_PREFIX}${chapterId}`;
+  }
+
+  private buildCoverImage(externalId: string, fileName?: string): string {
+    return fileName
+      ? `https://uploads.mangadex.org/covers/${externalId}/${fileName}.512.jpg`
+      : '';
   }
 
   private async getMangaFeedPage(externalId: string, limit: number, offset: number = 0) {
@@ -429,9 +435,7 @@ class MangaDexService {
     }
 
     const coverRel = manga.relationships.find((rel) => rel.type === 'cover_art');
-    const coverImage = coverRel
-      ? `https://uploads.mangadex.org/covers/${externalId}/${coverRel.attributes.fileName}.512.jpg`
-      : '';
+    const coverImage = this.buildCoverImage(externalId, coverRel?.attributes?.fileName);
 
     return {
       _id: this.toSeriesId(externalId),
@@ -439,6 +443,7 @@ class MangaDexService {
       title,
       description,
       coverImage,
+      thumbnailImage: coverImage,
       genres: genres.slice(0, 5),
       status: attributes.status || 'ongoing',
       originalLanguage: attributes.originalLanguage || 'unknown',
@@ -525,7 +530,10 @@ class MangaDexService {
         const attributes = manga.attributes;
         const id = manga.id;
 
-        const transformed: Partial<ISeries> & { externalId?: string } = {
+        const transformed: Partial<ISeries> & {
+          externalId?: string;
+          thumbnailImage?: string;
+        } = {
           title: this.pickSeriesTitle(attributes),
           description: this.pickLocalizedValue(attributes.description),
           status: attributes.status || 'ongoing',
@@ -546,9 +554,8 @@ class MangaDexService {
 
         // Cover art
         const coverRel = manga.relationships.find((rel) => rel.type === 'cover_art');
-        if (coverRel) {
-          transformed.coverImage = `https://uploads.mangadex.org/covers/${id}/${coverRel.attributes.fileName}.512.jpg`;
-        }
+        transformed.coverImage = this.buildCoverImage(id, coverRel?.attributes?.fileName);
+        transformed.thumbnailImage = transformed.coverImage;
 
         seriesList.push(transformed as Partial<ISeries>);
 
@@ -739,9 +746,26 @@ class MangaDexService {
     const seriesId = mangaRelationship ? this.toSeriesId(mangaRelationship.id) : '';
     const baseUrl = atHomeResponse.data.baseUrl;
     const hash = atHomeResponse.data.chapter.hash;
-    const pages = (atHomeResponse.data.chapter.data || []).map(
-      (fileName) => `${baseUrl}/data/${hash}/${fileName}`
-    );
+    const pageSources = (atHomeResponse.data.chapter.data || [])
+      .map((fileName, index) => {
+        const dataUrl = `${baseUrl}/data/${hash}/${fileName}`;
+        const dataSaverFileName = atHomeResponse.data.chapter.dataSaver?.[index];
+        const dataSaverUrl = dataSaverFileName
+          ? `${baseUrl}/data-saver/${hash}/${dataSaverFileName}`
+          : '';
+        const candidates = [dataUrl, dataSaverUrl].filter(Boolean);
+
+        if (candidates.length === 0) {
+          return null;
+        }
+
+        return {
+          url: candidates[0],
+          candidates: [...new Set(candidates)],
+        };
+      })
+      .filter((pageSource): pageSource is { url: string; candidates: string[] } => Boolean(pageSource));
+    const pages = pageSources.map((pageSource) => pageSource.url);
 
     return {
       _id: this.toChapterId(chapter.id),
@@ -749,6 +773,8 @@ class MangaDexService {
       title: chapter.attributes.title || `Chapter ${chapter.attributes.chapter || '?'}`,
       number: chapter.attributes.chapter || '?',
       pages,
+      pageSources,
+      previewImage: pageSources[0]?.url || '',
     };
   }
 }

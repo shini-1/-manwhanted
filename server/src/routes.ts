@@ -8,6 +8,7 @@ import {
 } from './controllers/seriesController.js';
 import { logError } from './controllers/logController.js';
 import { importPopular } from './controllers/mangadex.controller.js';
+import { proxyImage } from './controllers/imageController.js';
 
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.get('/', (req, res) => {
 
 // Client-side logging
 router.post('/logs', logError);
+router.get('/images/proxy', proxyImage);
 
 // MangaDex admin
 router.post('/admin/import-popular', importPopular);

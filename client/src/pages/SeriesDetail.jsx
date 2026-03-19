@@ -5,6 +5,7 @@ import { BookmarkContext } from '../context/BookmarkContext';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import { getStoredHomePath } from '../utils/navigationState';
+import SmartImage from '../SmartImage';
 
 const SeriesDetail = () => {
   const CHAPTERS_PER_PAGE = 25;
@@ -78,8 +79,10 @@ const SeriesDetail = () => {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
-          <img
-            src={series.coverImage || 'https://via.placeholder.com/500x750'}
+          <SmartImage
+            src={series.thumbnailImage || series.coverImage}
+            sources={series.coverImage ? [series.coverImage] : []}
+            fallbackSrc="https://placehold.co/500x750/111827/f9fafb?text=Manwhanted"
             alt={series.title}
             className="w-full rounded-lg shadow-lg mb-6"
           />
