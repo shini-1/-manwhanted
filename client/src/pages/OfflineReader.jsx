@@ -200,12 +200,12 @@ const OfflineReader = () => {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <Link to={homeHref} className="text-blue-400 hover:underline">
-            Back to home
+            Home
           </Link>
         </div>
         <button
           type="button"
-          className="rounded-full border border-emerald-400/40 bg-emerald-500/15 px-4 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/25"
+          className="simple-button simple-button-success"
           onClick={() => fileInputRef.current?.click()}
         >
           Open CBZ

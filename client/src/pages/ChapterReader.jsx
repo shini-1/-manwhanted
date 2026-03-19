@@ -92,6 +92,9 @@ const ChapterReader = () => {
     .filter(Boolean);
   const visiblePages = pageEntries.slice(0, visiblePageCount);
   const homeHref = getStoredHomePath();
+  const chapterHeading = chapter.title && /^chapter\b/i.test(chapter.title.trim())
+    ? chapter.title.trim()
+    : `Chapter ${chapter.number}`;
 
   const revealNextPage = (pageIndex) => {
     setVisiblePageCount((current) => {
@@ -188,22 +191,22 @@ const ChapterReader = () => {
       {prevChapterId ? (
         <Link
           to={`/read/${prevChapterId}`}
-          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+          className="simple-button"
         >
-          Previous Chapter
+          Previous
         </Link>
       ) : (
-        <span className="px-4 py-2 text-gray-500">Previous Chapter</span>
+        <span className="simple-button simple-button-disabled">Previous</span>
       )}
       {nextChapterId ? (
         <Link
           to={`/read/${nextChapterId}`}
-          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+          className="simple-button"
         >
-          Next Chapter
+          Next
         </Link>
       ) : (
-        <span className="px-4 py-2 text-gray-500">Next Chapter</span>
+        <span className="simple-button simple-button-disabled">Next</span>
       )}
     </div>
   );
@@ -214,31 +217,30 @@ const ChapterReader = () => {
         <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <Link to={homeHref} className="text-blue-600 hover:underline">
-              Back to home results
+              Home
             </Link>
             <Link to={`/series/${chapter.series}`} className="text-blue-600 hover:underline">
-              Back to series
+              Series
             </Link>
           </div>
           <div className="flex flex-col gap-3 text-left sm:items-end sm:text-right">
             <div>
-              <h1 className="text-2xl font-bold">{chapter.title}</h1>
-              <span className="text-gray-500">Chapter {chapter.number}</span>
+              <h1 className="text-2xl font-bold">{chapterHeading}</h1>
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
               <button
                 type="button"
-                className={`reader-mode-toggle ${mobileReaderMode ? 'reader-mode-toggle-active' : ''}`}
+                className={`simple-button ${mobileReaderMode ? 'simple-button-primary' : ''}`}
                 onClick={() => setMobileReaderMode((current) => !current)}
               >
-                {mobileReaderMode ? 'Exit Mobile Fit' : 'Mobile Fit 50%'}
+                {mobileReaderMode ? 'Exit Mobile Fit' : 'Mobile Fit'}
               </button>
               {downloadConfig.enabled ? (
                 <a
                   href={downloadHref}
-                  className="w-full rounded-full bg-emerald-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg transition hover:bg-emerald-500 sm:w-auto"
+                  className="simple-button simple-button-success w-full sm:w-auto text-center"
                 >
-                  Download Chapter
+                  Download CBZ
                 </a>
               ) : (
                 <span className="text-xs text-gray-400 sm:max-w-xs">
@@ -281,7 +283,7 @@ const ChapterReader = () => {
                         </p>
                         <button
                           type="button"
-                          className="mt-4 rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-500"
+                          className="simple-button simple-button-danger mt-4"
                           onClick={() => retryPage(index)}
                         >
                           Retry page

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api from '../api';
+import api, { buildApiUrl } from '../api';
 import { BookmarkContext } from '../context/BookmarkContext';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
@@ -74,7 +74,7 @@ const SeriesDetail = () => {
     <div className="container mx-auto p-8">
       <div className="mb-6">
         <Link to={homeHref} className="text-blue-600 hover:underline">
-          Back to home results
+          Home
         </Link>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -95,7 +95,7 @@ const SeriesDetail = () => {
           <div className="space-y-3">
             {!isExternalSeries && (
               <button
-                className={`w-full py-2 rounded-lg text-white ${isBookmarked() ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                className={`simple-button w-full ${isBookmarked() ? 'simple-button-danger' : 'simple-button-primary'}`}
                 onClick={handleBookmarkToggle}
               >
                 {isBookmarked() ? 'Remove Bookmark' : 'Add to Bookmarks'}
@@ -110,7 +110,7 @@ const SeriesDetail = () => {
 
             {resumeChapterId && (
               <button
-                className="w-full py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                className="simple-button simple-button-success w-full"
                 onClick={() => window.location.assign(`/read/${resumeChapterId}`)}
               >
                 Resume Reading
@@ -129,7 +129,7 @@ const SeriesDetail = () => {
             {chapterCount > CHAPTERS_PER_PAGE && (
               <div className="flex items-center gap-3">
                 <button
-                  className="px-3 py-2 rounded bg-gray-200 text-gray-800 disabled:opacity-50"
+                  className="simple-button simple-button-secondary"
                   onClick={() => setChapterPage((current) => Math.max(current - 1, 1))}
                   disabled={chapterPage === 1}
                 >
@@ -139,7 +139,7 @@ const SeriesDetail = () => {
                   Page {chapterPage} of {totalChapterPages}
                 </span>
                 <button
-                  className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
+                  className="simple-button simple-button-primary"
                   onClick={() => setChapterPage((current) => Math.min(current + 1, totalChapterPages))}
                   disabled={chapterPage === totalChapterPages}
                 >
@@ -153,18 +153,28 @@ const SeriesDetail = () => {
               {visibleChapters.map((chapter) => (
                 <div
                   key={chapter._id}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                  className="flex flex-col gap-3 rounded-lg bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div>
                     <p className="font-semibold">{chapter.title}</p>
                     <p className="text-sm text-gray-500">Chapter {chapter.number}</p>
                   </div>
-                  <Link
-                    to={`/read/${chapter._id}`}
-                    className="text-blue-600 hover:underline"
-                  >
-                    Read
-                  </Link>
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      to={`/read/${chapter._id}`}
+                      className="simple-button simple-button-primary"
+                    >
+                      Read
+                    </Link>
+                    {!isExternalSeries && (
+                      <a
+                        href={buildApiUrl(`/chapters/${chapter._id}/download`)}
+                        className="simple-button simple-button-success"
+                      >
+                        Download CBZ
+                      </a>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
