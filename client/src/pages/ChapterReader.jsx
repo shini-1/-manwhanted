@@ -15,13 +15,7 @@ const ChapterReader = () => {
   const [error, setError] = useState(null);
   const [visiblePageCount, setVisiblePageCount] = useState(1);
   const [pageStates, setPageStates] = useState({});
-  const [mobileReaderMode, setMobileReaderMode] = useState(() => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-
-    return window.localStorage.getItem('manwhanted:readerMode') === 'mobile-fit';
-  });
+  const [mobileReaderMode, setMobileReaderMode] = useState(false);
 
   useEffect(() => {
     const loadChapter = async () => {
@@ -56,22 +50,6 @@ const ChapterReader = () => {
 
     loadChapter();
   }, [id]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return undefined;
-    }
-
-    window.localStorage.setItem(
-      'manwhanted:readerMode',
-      mobileReaderMode ? 'mobile-fit' : 'default'
-    );
-    document.body.classList.toggle('reader-mobile-fit-active', mobileReaderMode);
-
-    return () => {
-      document.body.classList.remove('reader-mobile-fit-active');
-    };
-  }, [mobileReaderMode]);
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorAlert message={error} />;
@@ -228,7 +206,7 @@ const ChapterReader = () => {
 
   return (
     <div className={`mx-auto p-4 ${mobileReaderMode ? 'reader-mobile-fit-shell' : 'max-w-4xl'}`}>
-      <div className={mobileReaderMode ? 'reader-mobile-stage' : ''}>
+      <div className={mobileReaderMode ? 'reader-mobile-fit-surface' : ''}>
         <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <Link to={homeHref} className="text-blue-600 hover:underline">
