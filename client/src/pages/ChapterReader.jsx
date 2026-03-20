@@ -4,7 +4,7 @@ import api from '../api';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import { BookmarkContext } from '../context/BookmarkContext';
-import { downloadApiFile } from '../utils/downloads';
+import { downloadApiFile, downloadChapterAsCbz } from '../utils/downloads';
 import { getStoredHomePath } from '../utils/navigationState';
 import { buildCacheBustedImageSrc, buildImageCandidates } from '../utils/images';
 
@@ -69,19 +69,6 @@ const ChapterReader = () => {
   const seriesId = typeof chapter.series === 'string' ? chapter.series : '';
   const isExternalSeries = Boolean(seriesId?.startsWith('md_'));
   const isBookmarked = Array.isArray(bookmarks) && bookmarks.includes(seriesId);
-  const downloadConfig = chapter?.download?.enabled && chapter?.download?.url
-    ? chapter.download
-    : !isExternalSeries && chapterId
-      ? {
-          enabled: true,
-          url: `/chapters/${chapterId}/download`,
-          label: 'Download Chapter',
-          format: 'cbz',
-        }
-      : chapter.download || {
-          enabled: false,
-          reason: 'Downloads are limited to local library chapters.',
-        };
   const pageUrls = Array.isArray(chapter.pages) ? chapter.pages : [];
   const rawPageSources = Array.isArray(chapter.pageSources) && chapter.pageSources.length > 0
     ? chapter.pageSources
@@ -114,19 +101,26 @@ const ChapterReader = () => {
   const chapterHeading = chapter.title && /^chapter\b/i.test(chapter.title.trim())
     ? chapter.title.trim()
     : `Chapter ${chapter.number}`;
+  const canDownloadChapter = Boolean(chapterId) && pageEntries.length > 0;
+  const downloadReason = pageEntries.length === 0
+    ? 'Download unavailable for this chapter because no readable pages were found.'
+    : 'Download unavailable for this chapter.';
 
   const handleChapterDownload = async () => {
-    if (!downloadConfig.enabled || !downloadConfig.url) {
+    if (!canDownloadChapter) {
       return;
     }
 
     try {
       setIsDownloading(true);
       setActionError(null);
-      await downloadApiFile(
-        downloadConfig.url,
-        `${chapterHeading.replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').trim() || 'chapter'}.cbz`
-      );
+      const fallbackFileName = `${chapterHeading.replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').trim() || 'chapter'}.cbz`;
+
+      if (!isExternalSeries) {
+        await downloadApiFile(`/chapters/${chapterId}/download`, fallbackFileName);
+      } else {
+        await downloadChapterAsCbz(chapter, fallbackFileName);
+      }
     } catch (err) {
       setActionError(err?.message || 'Unable to download this chapter.');
     } finally {
@@ -299,7 +293,7 @@ const ChapterReader = () => {
                   {isBookmarked ? 'Remove Bookmark' : 'Add to Bookmarks'}
                 </button>
               )}
-              {downloadConfig.enabled ? (
+              {canDownloadChapter ? (
                 <button
                   type="button"
                   className="simple-button simple-button-success w-full sm:w-auto text-center"
@@ -314,12 +308,12 @@ const ChapterReader = () => {
                     type="button"
                     className="simple-button simple-button-disabled w-full sm:w-auto"
                     disabled
-                    title={downloadConfig.reason || 'Download unavailable for this chapter.'}
+                    title={downloadReason}
                   >
                     Download CBZ
                   </button>
                   <span className="text-xs text-gray-400 sm:max-w-xs">
-                    {downloadConfig.reason || 'Download unavailable for this chapter.'}
+                    {downloadReason}
                   </span>
                 </>
               )}

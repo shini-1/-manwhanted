@@ -5,7 +5,7 @@ import { BookmarkContext } from '../context/BookmarkContext';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import { getStoredHomePath } from '../utils/navigationState';
-import { downloadApiFile } from '../utils/downloads';
+import { downloadApiFile, downloadChapterAsCbz, downloadSeriesBatchAsZip } from '../utils/downloads';
 import SmartImage from '../SmartImage';
 
 const normalizeChapters = (value) =>
@@ -44,7 +44,7 @@ const SeriesDetail = () => {
   };
 
   const handleBatchDownload = async (mode) => {
-    if (!id || isExternalSeries) {
+    if (!id) {
       return;
     }
 
@@ -57,7 +57,24 @@ const SeriesDetail = () => {
     try {
       setActiveDownload(mode);
       setActionError(null);
-      await downloadApiFile(path, fallbackFileName);
+      if (!isExternalSeries) {
+        await downloadApiFile(path, fallbackFileName);
+        return;
+      }
+
+      const targetChapters = mode === 'visible' ? visibleChapters : chapters;
+      const fullChapters = [];
+
+      for (const chapter of targetChapters) {
+        if (!chapter?._id) {
+          continue;
+        }
+
+        const chapterRes = await api.get(`/chapters/${chapter._id}`);
+        fullChapters.push(chapterRes.data);
+      }
+
+      await downloadSeriesBatchAsZip(series?.title || 'series', fullChapters, fallbackFileName);
     } catch (err) {
       setActionError(
         err?.message || err?.response?.data?.message || 'Unable to download the selected CBZ batch.'
@@ -68,7 +85,7 @@ const SeriesDetail = () => {
   };
 
   const handleChapterDownload = async (chapter) => {
-    if (!chapter?._id || isExternalSeries) {
+    if (!chapter?._id) {
       return;
     }
 
@@ -80,10 +97,16 @@ const SeriesDetail = () => {
     try {
       setActiveChapterDownloadId(chapter._id);
       setActionError(null);
-      await downloadApiFile(
-        `/chapters/${chapter._id}/download`,
-        `${chapterLabel || 'chapter'}.cbz`
-      );
+      if (!isExternalSeries) {
+        await downloadApiFile(
+          `/chapters/${chapter._id}/download`,
+          `${chapterLabel || 'chapter'}.cbz`
+        );
+        return;
+      }
+
+      const chapterRes = await api.get(`/chapters/${chapter._id}`);
+      await downloadChapterAsCbz(chapterRes.data, `${chapterLabel || 'chapter'}.cbz`);
     } catch (err) {
       setActionError(err?.message || 'Unable to download this chapter.');
     } finally {
@@ -135,8 +158,8 @@ const SeriesDetail = () => {
   const visibleChapters = chapters.slice(chapterStartIndex, chapterStartIndex + CHAPTERS_PER_PAGE);
   const homeHref = getStoredHomePath();
   const visibleChapterIds = visibleChapters.map((chapter) => chapter._id).filter(Boolean);
-  const canDownloadVisibleBatch = !isExternalSeries && visibleChapterIds.length > 0;
-  const canDownloadFullBatch = !isExternalSeries && chapterCount > 0;
+  const canDownloadVisibleBatch = visibleChapterIds.length > 0;
+  const canDownloadFullBatch = chapterCount > 0;
 
   return (
     <div className="container mx-auto p-8">
@@ -168,7 +191,7 @@ const SeriesDetail = () => {
               {isBookmarked() ? 'Remove Bookmark' : 'Add to Bookmarks'}
             </button>
 
-            {!isExternalSeries && chapterCount > 0 && (
+            {chapterCount > 0 && (
               <>
                 <button
                   type="button"
@@ -187,12 +210,6 @@ const SeriesDetail = () => {
                   {activeDownload === 'visible' ? 'Preparing Visible Batch...' : 'Download Visible CBZs'}
                 </button>
               </>
-            )}
-
-            {isExternalSeries && (
-              <p className="text-sm text-gray-500">
-                MangaDex series can be bookmarked here, but downloads stay limited to local library entries.
-              </p>
             )}
 
             {resumeChapterId && (
@@ -256,16 +273,14 @@ const SeriesDetail = () => {
                     >
                       Read
                     </Link>
-                    {!isExternalSeries && (
-                      <button
-                        type="button"
-                        className="simple-button simple-button-success flex-1 sm:flex-none"
-                        onClick={() => handleChapterDownload(chapter)}
-                        disabled={activeChapterDownloadId !== '' && activeChapterDownloadId !== chapter._id}
-                      >
-                        {activeChapterDownloadId === chapter._id ? 'Preparing CBZ...' : 'Download CBZ'}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="simple-button simple-button-success flex-1 sm:flex-none"
+                      onClick={() => handleChapterDownload(chapter)}
+                      disabled={activeChapterDownloadId !== '' && activeChapterDownloadId !== chapter._id}
+                    >
+                      {activeChapterDownloadId === chapter._id ? 'Preparing CBZ...' : 'Download CBZ'}
+                    </button>
                   </div>
                 </div>
               ))}
