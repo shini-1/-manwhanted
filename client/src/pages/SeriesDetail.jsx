@@ -8,11 +8,15 @@ import { getStoredHomePath } from '../utils/navigationState';
 import { downloadApiFile } from '../utils/downloads';
 import SmartImage from '../SmartImage';
 
+const normalizeChapters = (value) =>
+  Array.isArray(value) ? value.filter((chapter) => chapter && typeof chapter === 'object') : [];
+
 const SeriesDetail = () => {
   const CHAPTERS_PER_PAGE = 25;
   const { id } = useParams();
   const { bookmarks, addBookmark, removeBookmark } = useContext(BookmarkContext);
   const [series, setSeries] = useState(null);
+  const [chapters, setChapters] = useState([]);
   const [resumeChapterId, setResumeChapterId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -95,8 +99,17 @@ const SeriesDetail = () => {
       setActionError(null);
       try {
         const res = await api.get(`/series/${id}`);
-        setSeries(res.data);
+        const nextSeries = res.data;
+        const nextChapters = normalizeChapters(nextSeries?.chapters);
+
+        setSeries(nextSeries);
+        setChapters(nextChapters);
         setChapterPage(1);
+
+        if (nextChapters.length === 0) {
+          const chaptersRes = await api.get(`/series/${id}/chapters`);
+          setChapters(normalizeChapters(chaptersRes.data));
+        }
 
         const savedChapter = localStorage.getItem(`manwhanted:lastRead:${id}`);
         if (savedChapter) {
@@ -116,12 +129,10 @@ const SeriesDetail = () => {
   if (loadError) return <ErrorAlert message={loadError} />;
   if (!series) return null;
 
-  const chapterCount = Array.isArray(series.chapters) ? series.chapters.length : 0;
+  const chapterCount = chapters.length;
   const totalChapterPages = chapterCount > 0 ? Math.ceil(chapterCount / CHAPTERS_PER_PAGE) : 1;
   const chapterStartIndex = (chapterPage - 1) * CHAPTERS_PER_PAGE;
-  const visibleChapters = Array.isArray(series.chapters)
-    ? series.chapters.slice(chapterStartIndex, chapterStartIndex + CHAPTERS_PER_PAGE)
-    : [];
+  const visibleChapters = chapters.slice(chapterStartIndex, chapterStartIndex + CHAPTERS_PER_PAGE);
   const homeHref = getStoredHomePath();
   const visibleChapterIds = visibleChapters.map((chapter) => chapter._id).filter(Boolean);
   const canDownloadVisibleBatch = !isExternalSeries && visibleChapterIds.length > 0;
@@ -161,19 +172,19 @@ const SeriesDetail = () => {
               <>
                 <button
                   type="button"
+                  className="simple-button simple-button-primary w-full text-center"
+                  onClick={() => handleBatchDownload('all')}
+                  disabled={activeDownload !== '' || !canDownloadFullBatch}
+                >
+                  {activeDownload === 'all' ? 'Preparing Series ZIP...' : 'Download Series ZIP'}
+                </button>
+                <button
+                  type="button"
                   className="simple-button simple-button-success w-full text-center"
                   onClick={() => handleBatchDownload('visible')}
                   disabled={activeDownload !== '' || !canDownloadVisibleBatch}
                 >
                   {activeDownload === 'visible' ? 'Preparing Visible Batch...' : 'Download Visible CBZs'}
-                </button>
-                <button
-                  type="button"
-                  className="simple-button simple-button-secondary w-full text-center"
-                  onClick={() => handleBatchDownload('all')}
-                  disabled={activeDownload !== '' || !canDownloadFullBatch}
-                >
-                  {activeDownload === 'all' ? 'Preparing Full Batch...' : 'Download All CBZs'}
                 </button>
               </>
             )}

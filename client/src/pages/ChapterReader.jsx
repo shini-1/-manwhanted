@@ -65,10 +65,23 @@ const ChapterReader = () => {
   const nextChapterId = chapterIndex >= 0 && series?.chapters?.length
     ? series.chapters?.[chapterIndex + 1]?._id
     : null;
+  const chapterId = typeof chapter?._id === 'string' ? chapter._id : id || '';
   const seriesId = typeof chapter.series === 'string' ? chapter.series : '';
   const isExternalSeries = Boolean(seriesId?.startsWith('md_'));
   const isBookmarked = Array.isArray(bookmarks) && bookmarks.includes(seriesId);
-  const downloadConfig = chapter.download || { enabled: false };
+  const downloadConfig = chapter?.download?.enabled && chapter?.download?.url
+    ? chapter.download
+    : !isExternalSeries && chapterId
+      ? {
+          enabled: true,
+          url: `/chapters/${chapterId}/download`,
+          label: 'Download Chapter',
+          format: 'cbz',
+        }
+      : chapter.download || {
+          enabled: false,
+          reason: 'Downloads are limited to local library chapters.',
+        };
   const pageUrls = Array.isArray(chapter.pages) ? chapter.pages : [];
   const rawPageSources = Array.isArray(chapter.pageSources) && chapter.pageSources.length > 0
     ? chapter.pageSources
@@ -265,7 +278,7 @@ const ChapterReader = () => {
               Series
             </Link>
           </div>
-          <div className="flex flex-col gap-3 text-left sm:items-end sm:text-right">
+          <div className="relative z-10 flex flex-col gap-3 text-left sm:items-end sm:text-right">
             <div>
               <h1 className="text-2xl font-bold">{chapterHeading}</h1>
             </div>
