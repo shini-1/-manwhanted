@@ -25,6 +25,11 @@ const sanitizeFileName = (value: string) =>
     .trim()
     .slice(0, 120) || 'chapter';
 
+const wait = (durationMs: number) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
+
 const resolveFileExtension = (url: string, contentType?: string) => {
   if (contentType) {
     const normalizedContentType = contentType.split(';')[0]?.trim().toLowerCase();
@@ -103,28 +108,45 @@ const sortChaptersForDownload = <
   });
 
 const fetchPageFile = async (pageUrl: string, index: number) => {
-  const response = await axios.get<ArrayBuffer>(pageUrl, {
-    responseType: 'arraybuffer',
-    timeout: 30000,
-    headers: {
-      Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-      'User-Agent': 'Mozilla/5.0 (compatible; Manwhanted/1.0)',
-      Referer: (() => {
-        try {
-          return `${new URL(pageUrl).origin}/`;
-        } catch (error) {
-          return undefined;
-        }
-      })(),
-    },
-  });
+  const referer = (() => {
+    try {
+      return `${new URL(pageUrl).origin}/`;
+    } catch (error) {
+      return undefined;
+    }
+  })();
 
-  const extension = resolveFileExtension(pageUrl, response.headers['content-type']);
+  let lastError: unknown = null;
 
-  return {
-    name: `${String(index + 1).padStart(3, '0')}.${extension}`,
-    data: Buffer.from(response.data),
-  };
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await axios.get<ArrayBuffer>(pageUrl, {
+        responseType: 'arraybuffer',
+        timeout: 30000,
+        maxRedirects: 5,
+        headers: {
+          Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (compatible; Manwhanted/1.0)',
+          Referer: referer,
+        },
+      });
+
+      const extension = resolveFileExtension(pageUrl, response.headers['content-type']);
+
+      return {
+        name: `${String(index + 1).padStart(3, '0')}.${extension}`,
+        data: Buffer.from(response.data),
+      };
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < 3) {
+        await wait(250 * attempt);
+      }
+    }
+  }
+
+  throw lastError;
 };
 
 const buildChapterCbzBuffer = async (chapter: {
@@ -140,7 +162,11 @@ const buildChapterCbzBuffer = async (chapter: {
     throw new Error('This chapter has no downloadable pages.');
   }
 
-  const pageFiles = await Promise.all(pageUrls.map((pageUrl, index) => fetchPageFile(pageUrl, index)));
+  const pageFiles: { name: string; data: Buffer }[] = [];
+
+  for (const [index, pageUrl] of pageUrls.entries()) {
+    pageFiles.push(await fetchPageFile(pageUrl, index));
+  }
 
   return new Promise<{ fileName: string; buffer: Buffer }>((resolve, reject) => {
     const archive = archiver('zip', { zlib: { level: 9 } });
@@ -166,6 +192,20 @@ const buildChapterCbzBuffer = async (chapter: {
 
     archive.finalize().catch(reject);
   });
+};
+
+const buildBatchChapterArchives = async (chapters: {
+  title?: string;
+  number?: string;
+  pages?: string[];
+}[]) => {
+  const chapterArchives: { fileName: string; buffer: Buffer }[] = [];
+
+  for (const chapter of chapters) {
+    chapterArchives.push(await buildChapterCbzBuffer(chapter));
+  }
+
+  return chapterArchives;
 };
 
 const resolveSeriesForBatchDownload = async (seriesId: string, requestedChapterIds: string[]) => {
@@ -257,6 +297,7 @@ export const downloadSeriesChapterBatch = async (req: Request, res: Response) =>
   }
 
   try {
+    const chapterArchives = await buildBatchChapterArchives(series.chapters);
     const archiveFileName = `${sanitizeFileName(series.title || 'Series')} Batch.zip`;
 
     res.setHeader('Content-Type', 'application/zip');
@@ -277,8 +318,7 @@ export const downloadSeriesChapterBatch = async (req: Request, res: Response) =>
 
     archive.pipe(res);
 
-    for (const chapter of series.chapters) {
-      const { fileName, buffer } = await buildChapterCbzBuffer(chapter);
+    for (const { fileName, buffer } of chapterArchives) {
       archive.append(buffer, { name: fileName });
     }
 

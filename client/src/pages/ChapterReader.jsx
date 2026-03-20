@@ -1,9 +1,10 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api, { buildApiUrl } from '../api';
+import api from '../api';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import { BookmarkContext } from '../context/BookmarkContext';
+import { downloadApiFile } from '../utils/downloads';
 import { getStoredHomePath } from '../utils/navigationState';
 import { buildCacheBustedImageSrc, buildImageCandidates } from '../utils/images';
 
@@ -16,6 +17,7 @@ const ChapterReader = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionError, setActionError] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [visiblePageCount, setVisiblePageCount] = useState(1);
   const [pageStates, setPageStates] = useState({});
   const [mobileReaderMode, setMobileReaderMode] = useState(false);
@@ -67,9 +69,6 @@ const ChapterReader = () => {
   const isExternalSeries = Boolean(seriesId?.startsWith('md_'));
   const isBookmarked = Array.isArray(bookmarks) && bookmarks.includes(seriesId);
   const downloadConfig = chapter.download || { enabled: false };
-  const downloadHref = downloadConfig.enabled && downloadConfig.url
-    ? buildApiUrl(downloadConfig.url)
-    : '';
   const pageUrls = Array.isArray(chapter.pages) ? chapter.pages : [];
   const rawPageSources = Array.isArray(chapter.pageSources) && chapter.pageSources.length > 0
     ? chapter.pageSources
@@ -102,6 +101,25 @@ const ChapterReader = () => {
   const chapterHeading = chapter.title && /^chapter\b/i.test(chapter.title.trim())
     ? chapter.title.trim()
     : `Chapter ${chapter.number}`;
+
+  const handleChapterDownload = async () => {
+    if (!downloadConfig.enabled || !downloadConfig.url) {
+      return;
+    }
+
+    try {
+      setIsDownloading(true);
+      setActionError(null);
+      await downloadApiFile(
+        downloadConfig.url,
+        `${chapterHeading.replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').trim() || 'chapter'}.cbz`
+      );
+    } catch (err) {
+      setActionError(err?.message || 'Unable to download this chapter.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handleBookmarkToggle = async () => {
     if (!seriesId || isExternalSeries) {
@@ -269,12 +287,14 @@ const ChapterReader = () => {
                 </button>
               )}
               {downloadConfig.enabled ? (
-                <a
-                  href={downloadHref}
+                <button
+                  type="button"
                   className="simple-button simple-button-success w-full sm:w-auto text-center"
+                  onClick={handleChapterDownload}
+                  disabled={isDownloading}
                 >
-                  Download CBZ
-                </a>
+                  {isDownloading ? 'Preparing CBZ...' : 'Download CBZ'}
+                </button>
               ) : (
                 <>
                   <button

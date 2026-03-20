@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api, { buildApiUrl } from '../api';
+import api from '../api';
 import { BookmarkContext } from '../context/BookmarkContext';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
@@ -18,6 +18,7 @@ const SeriesDetail = () => {
   const [loadError, setLoadError] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [activeDownload, setActiveDownload] = useState('');
+  const [activeChapterDownloadId, setActiveChapterDownloadId] = useState('');
   const [chapterPage, setChapterPage] = useState(1);
   const isExternalSeries = Boolean(id?.startsWith('md_'));
 
@@ -62,6 +63,30 @@ const SeriesDetail = () => {
     }
   };
 
+  const handleChapterDownload = async (chapter) => {
+    if (!chapter?._id || isExternalSeries) {
+      return;
+    }
+
+    const chapterLabel = `${chapter.title || 'Chapter'} ${chapter.number || ''}`
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    try {
+      setActiveChapterDownloadId(chapter._id);
+      setActionError(null);
+      await downloadApiFile(
+        `/chapters/${chapter._id}/download`,
+        `${chapterLabel || 'chapter'}.cbz`
+      );
+    } catch (err) {
+      setActionError(err?.message || 'Unable to download this chapter.');
+    } finally {
+      setActiveChapterDownloadId('');
+    }
+  };
+
   useEffect(() => {
     const loadSeries = async () => {
       if (!id) return;
@@ -99,12 +124,8 @@ const SeriesDetail = () => {
     : [];
   const homeHref = getStoredHomePath();
   const visibleChapterIds = visibleChapters.map((chapter) => chapter._id).filter(Boolean);
-  const downloadVisibleHref = !isExternalSeries && visibleChapterIds.length > 0
-    ? buildApiUrl(`/series/${id}/download?chapterIds=${visibleChapterIds.join(',')}`)
-    : '';
-  const downloadAllHref = !isExternalSeries && chapterCount > 0
-    ? buildApiUrl(`/series/${id}/download`)
-    : '';
+  const canDownloadVisibleBatch = !isExternalSeries && visibleChapterIds.length > 0;
+  const canDownloadFullBatch = !isExternalSeries && chapterCount > 0;
 
   return (
     <div className="container mx-auto p-8">
@@ -142,7 +163,7 @@ const SeriesDetail = () => {
                   type="button"
                   className="simple-button simple-button-success w-full text-center"
                   onClick={() => handleBatchDownload('visible')}
-                  disabled={activeDownload !== '' || !downloadVisibleHref}
+                  disabled={activeDownload !== '' || !canDownloadVisibleBatch}
                 >
                   {activeDownload === 'visible' ? 'Preparing Visible Batch...' : 'Download Visible CBZs'}
                 </button>
@@ -150,7 +171,7 @@ const SeriesDetail = () => {
                   type="button"
                   className="simple-button simple-button-secondary w-full text-center"
                   onClick={() => handleBatchDownload('all')}
-                  disabled={activeDownload !== '' || !downloadAllHref}
+                  disabled={activeDownload !== '' || !canDownloadFullBatch}
                 >
                   {activeDownload === 'all' ? 'Preparing Full Batch...' : 'Download All CBZs'}
                 </button>
@@ -225,12 +246,14 @@ const SeriesDetail = () => {
                       Read
                     </Link>
                     {!isExternalSeries && (
-                      <a
-                        href={buildApiUrl(`/chapters/${chapter._id}/download`)}
+                      <button
+                        type="button"
                         className="simple-button simple-button-success flex-1 sm:flex-none"
+                        onClick={() => handleChapterDownload(chapter)}
+                        disabled={activeChapterDownloadId !== '' && activeChapterDownloadId !== chapter._id}
                       >
-                        Download CBZ
-                      </a>
+                        {activeChapterDownloadId === chapter._id ? 'Preparing CBZ...' : 'Download CBZ'}
+                      </button>
                     )}
                   </div>
                 </div>

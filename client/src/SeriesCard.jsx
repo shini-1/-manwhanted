@@ -1,12 +1,13 @@
 import React, { useContext, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { buildApiUrl } from './api';
 import { BookmarkContext } from './context/BookmarkContext';
+import { downloadApiFile } from './utils/downloads';
 import SmartImage from './SmartImage';
 
 export default function SeriesCard({ series }) {
   const { bookmarks, addBookmark, removeBookmark } = useContext(BookmarkContext);
   const [actionError, setActionError] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   const seriesId = typeof series?._id === 'string' ? series._id : '';
   const isExternalSeries = Boolean(seriesId?.startsWith('md_'));
   const isBookmarked = Array.isArray(bookmarks) && bookmarks.includes(seriesId);
@@ -32,8 +33,26 @@ export default function SeriesCard({ series }) {
     }
   };
 
-  const stopCardNavigation = (event) => {
+  const handleSeriesDownload = async (event) => {
+    event.preventDefault();
     event.stopPropagation();
+
+    if (!seriesId || isExternalSeries) {
+      return;
+    }
+
+    try {
+      setIsDownloading(true);
+      setActionError(null);
+      await downloadApiFile(
+        `/series/${seriesId}/download`,
+        `${(series.title || 'series').replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').trim() || 'series'} batch.zip`
+      );
+    } catch (err) {
+      setActionError(err?.message || 'Unable to download this series.');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (
@@ -72,13 +91,14 @@ export default function SeriesCard({ series }) {
             >
               {isBookmarked ? 'Bookmarked' : 'Bookmark'}
             </button>
-            <a
-              href={buildApiUrl(`/series/${seriesId}/download`)}
+            <button
+              type="button"
               className="simple-button simple-button-success flex-1 text-center"
-              onClick={stopCardNavigation}
+              onClick={handleSeriesDownload}
+              disabled={isDownloading}
             >
-              Download
-            </a>
+              {isDownloading ? 'Preparing Download...' : 'Download'}
+            </button>
           </div>
           {actionError && (
             <p className="mt-2 text-xs text-red-400">{actionError}</p>

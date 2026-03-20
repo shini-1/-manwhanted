@@ -125,6 +125,13 @@ const buildChapterCbzBuffer = async (chapter) => {
         archive.finalize().catch(reject);
     });
 };
+const buildBatchChapterArchives = async (chapters) => {
+    const chapterArchives = [];
+    for (const chapter of chapters) {
+        chapterArchives.push(await buildChapterCbzBuffer(chapter));
+    }
+    return chapterArchives;
+};
 const resolveSeriesForBatchDownload = async (seriesId, requestedChapterIds) => {
     if (mangadexService.isMangaDexSeriesId(seriesId)) {
         return null;
@@ -197,6 +204,7 @@ export const downloadSeriesChapterBatch = async (req, res) => {
         return res.status(400).json({ message: 'No chapters are available to download.' });
     }
     try {
+        const chapterArchives = await buildBatchChapterArchives(series.chapters);
         const archiveFileName = `${sanitizeFileName(series.title || 'Series')} Batch.zip`;
         res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename="${archiveFileName}"`);
@@ -211,8 +219,7 @@ export const downloadSeriesChapterBatch = async (req, res) => {
             res.end();
         });
         archive.pipe(res);
-        for (const chapter of series.chapters) {
-            const { fileName, buffer } = await buildChapterCbzBuffer(chapter);
+        for (const { fileName, buffer } of chapterArchives) {
             archive.append(buffer, { name: fileName });
         }
         await archive.finalize();
