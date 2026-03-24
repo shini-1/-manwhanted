@@ -115,13 +115,51 @@ const OfflineReader = () => {
     };
   }, [pages, savedPageIndex]);
 
-  const loadCbzFile = async (file) => {
-    if (!file) {
+  const processFileOrBlob = async (fileOrBlob, name) => {
+    let extractedPages = [];
+    const archive = await JSZip.loadAsync(fileOrBlob);
+
+    const cbzEntries = Object.values(archive.files)
+      .filter((entry) => !entry.dir && /\.cbz$/i.test(entry.name))
+      .sort((left, right) => fileNameCollator.compare(left.name, right.name));
+
+    for (const cbzEntry of cbzEntries) {
+      const cbzBlob = await cbzEntry.async('blob');
+      const nestedPages = await processFileOrBlob(cbzBlob, cbzEntry.name);
+      extractedPages = extractedPages.concat(nestedPages);
+    }
+
+    const imageEntries = Object.values(archive.files)
+      .filter((entry) => !entry.dir && IMAGE_ENTRY_PATTERN.test(entry.name))
+      .sort((left, right) => fileNameCollator.compare(left.name, right.name));
+
+    const directPages = await Promise.all(
+      imageEntries.map(async (entry) => {
+        const imageBlob = await entry.async('blob');
+        const objectUrl = URL.createObjectURL(imageBlob);
+        objectUrlsRef.current.push(objectUrl);
+
+        return {
+          id: `${name}:${entry.name}`,
+          label: entry.name,
+          url: objectUrl,
+        };
+      })
+    );
+
+    return extractedPages.concat(directPages);
+  };
+
+  const loadCbzFiles = async (files) => {
+    if (!files || files.length === 0) {
       return;
     }
 
-    if (!/\.cbz$/i.test(file.name)) {
-      setError('Please choose a .cbz file.');
+    const fileArray = Array.from(files).sort((a, b) => fileNameCollator.compare(a.name, b.name));
+    const validFiles = fileArray.filter((f) => /\.(cbz|zip)$/i.test(f.name));
+
+    if (validFiles.length === 0) {
+      setError('Please choose at least one .cbz or .zip file.');
       return;
     }
 
@@ -130,59 +168,55 @@ const OfflineReader = () => {
     clearObjectUrls();
 
     try {
-      const archive = await JSZip.loadAsync(file);
-      const imageEntries = Object.values(archive.files)
-        .filter((entry) => !entry.dir && IMAGE_ENTRY_PATTERN.test(entry.name))
-        .sort((left, right) => fileNameCollator.compare(left.name, right.name));
+      let allPages = [];
+      let totalSize = 0;
+      let collectiveName = validFiles.length === 1 ? validFiles[0].name : `${validFiles.length} files`;
+      let fingerprints = [];
 
-      if (imageEntries.length === 0) {
-        throw new Error('This CBZ file does not contain readable image pages.');
+      for (const file of validFiles) {
+        fingerprints.push(createFileFingerprint(file));
+        totalSize += file.size || 0;
+        const filePages = await processFileOrBlob(file, file.name);
+        allPages = allPages.concat(filePages);
       }
 
-      const nextPages = await Promise.all(
-        imageEntries.map(async (entry, index) => {
-          const imageBlob = await entry.async('blob');
-          const objectUrl = URL.createObjectURL(imageBlob);
-          objectUrlsRef.current.push(objectUrl);
+      if (allPages.length === 0) {
+        throw new Error('These files do not contain readable image pages.');
+      }
 
-          return {
-            id: `${entry.name}:${index}`,
-            label: entry.name,
-            url: objectUrl,
-          };
-        })
-      );
+      const combinedFingerprint = fingerprints.join('|');
+      const savedProgress = readSavedOfflineProgress(combinedFingerprint);
+      const initialPageIndex = Math.min(savedProgress?.pageIndex || 0, allPages.length - 1);
 
-      const fingerprint = createFileFingerprint(file);
-      const savedProgress = readSavedOfflineProgress(fingerprint);
-      const initialPageIndex = Math.min(savedProgress?.pageIndex || 0, nextPages.length - 1);
+      const finalPages = allPages.map((p, index) => ({
+        ...p,
+        id: `${p.id}:${index}`
+      }));
 
-      setPages(nextPages);
+      setPages(finalPages);
       setFileMeta({
-        fingerprint,
-        name: file.name,
-        pageCount: nextPages.length,
-        size: file.size,
+        fingerprint: combinedFingerprint,
+        name: collectiveName,
+        pageCount: finalPages.length,
+        size: totalSize,
       });
       setSavedPageIndex(initialPageIndex);
       setCurrentPageIndex(initialPageIndex);
     } catch (loadError) {
-      console.error('Offline CBZ load error:', loadError);
+      console.error('Offline files load error:', loadError);
       clearObjectUrls();
       setPages([]);
       setFileMeta(null);
       setSavedPageIndex(0);
       setCurrentPageIndex(0);
-      setError(loadError.message || 'Failed to open the CBZ file.');
+      setError(loadError.message || 'Failed to open the provided file(s).');
     } finally {
       setLoading(false);
     }
   };
 
   const handleFileSelection = async (event) => {
-    const nextFile = event.target.files?.[0];
-    await loadCbzFile(nextFile);
-
+    await loadCbzFiles(event.target.files);
     if (event.target) {
       event.target.value = '';
     }
@@ -191,8 +225,7 @@ const OfflineReader = () => {
   const handleDrop = async (event) => {
     event.preventDefault();
     setDragActive(false);
-    const nextFile = event.dataTransfer.files?.[0];
-    await loadCbzFile(nextFile);
+    await loadCbzFiles(event.dataTransfer.files);
   };
 
   return (
@@ -208,13 +241,14 @@ const OfflineReader = () => {
           className="simple-button simple-button-success"
           onClick={() => fileInputRef.current?.click()}
         >
-          Open CBZ
+          Open Files
         </button>
       </div>
 
       <input
         ref={fileInputRef}
         type="file"
+        multiple
         accept=".cbz,application/vnd.comicbook+zip,application/zip"
         className="hidden"
         onChange={handleFileSelection}
@@ -224,7 +258,7 @@ const OfflineReader = () => {
         <div className="mb-4">
           <h1 className="text-3xl font-bold text-slate-50">Offline Reader</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Open a downloaded CBZ from your device. The file stays in your browser session and
+            Open downloaded CBZ or ZIP files from your device. The files stay in your browser session and
             your reading progress is saved locally on this device.
           </p>
         </div>
@@ -243,9 +277,9 @@ const OfflineReader = () => {
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
         >
-          <p className="text-lg font-semibold text-slate-100">Tap to choose a CBZ file</p>
+          <p className="text-lg font-semibold text-slate-100">Tap to choose CBZ or ZIP files</p>
           <p className="mt-2 text-sm text-slate-400">
-            Drag and drop also works on desktop. No upload, no server storage.
+            Drag and drop also works on desktop. You can drop multiple .cbz files or a batch .zip file.
           </p>
         </label>
       </section>

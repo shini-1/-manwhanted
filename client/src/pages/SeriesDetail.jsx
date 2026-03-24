@@ -45,19 +45,16 @@ const SeriesDetail = () => {
     }
   };
 
-  const handleBatchDownload = async (mode) => {
+  const handleBatchDownload = async () => {
     if (!id) {
       return;
     }
 
-    const chapterIds = mode === 'visible' ? visibleChapterIds : [];
-    const path = chapterIds.length > 0
-      ? `/series/${id}/download?chapterIds=${chapterIds.join(',')}`
-      : `/series/${id}/download`;
-    const fallbackFileName = `${series?.title || 'series'} ${mode === 'visible' ? 'visible' : 'batch'}.zip`;
+    const path = `/series/${id}/download`;
+    const fallbackFileName = `${series?.title || 'series'} batch.zip`;
 
     try {
-      setActiveDownload(mode);
+      setActiveDownload('all');
       setDownloadProgress(null);
       setActionError(null);
       if (!isExternalSeries) {
@@ -65,10 +62,9 @@ const SeriesDetail = () => {
         return;
       }
 
-      const targetChapters = mode === 'visible' ? visibleChapters : chapters;
       const fullChapters = [];
 
-      for (const chapter of targetChapters) {
+      for (const chapter of chapters) {
         if (!chapter?._id) {
           continue;
         }
@@ -216,7 +212,7 @@ const SeriesDetail = () => {
                 <button
                   type="button"
                   className="simple-button simple-button-primary w-full text-center"
-                  onClick={() => handleBatchDownload('all')}
+                  onClick={() => handleBatchDownload()}
                   disabled={activeDownload !== '' || !canDownloadFullBatch}
                 >
                   {activeDownload === 'all' ? 'Preparing Series ZIP...' : 'Download Series ZIP'}
@@ -224,10 +220,20 @@ const SeriesDetail = () => {
                 <button
                   type="button"
                   className="simple-button simple-button-success w-full text-center"
-                  onClick={() => handleBatchDownload('visible')}
-                  disabled={activeDownload !== '' || !canDownloadVisibleBatch}
+                  onClick={() => {
+                    visibleChapters.forEach((chapter) => {
+                      if (chapterDownloads[chapter._id]?.status !== 'downloading') {
+                        handleChapterDownload(chapter);
+                      }
+                    });
+                  }}
+                  disabled={
+                    !canDownloadVisibleBatch ||
+                    (visibleChapters.length > 0 &&
+                      visibleChapters.every((c) => chapterDownloads[c._id]?.status === 'downloading'))
+                  }
                 >
-                  {activeDownload === 'visible' ? 'Preparing Visible Batch...' : 'Download Visible CBZs'}
+                  Download Visible CBZs
                 </button>
               </>
             )}
