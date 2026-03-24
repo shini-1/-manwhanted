@@ -7,6 +7,7 @@ import { BookmarkContext } from '../context/BookmarkContext';
 import { downloadApiFile, downloadChapterAsCbz } from '../utils/downloads';
 import { getStoredHomePath } from '../utils/navigationState';
 import { buildCacheBustedImageSrc, buildImageCandidates } from '../utils/images';
+import ProgressBar from '../components/ProgressBar';
 
 const ChapterReader = () => {
   const { id } = useParams();
@@ -18,6 +19,7 @@ const ChapterReader = () => {
   const [error, setError] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(null);
   const [visiblePageCount, setVisiblePageCount] = useState(1);
   const [pageStates, setPageStates] = useState({});
   const [mobileReaderMode, setMobileReaderMode] = useState(false);
@@ -113,18 +115,20 @@ const ChapterReader = () => {
 
     try {
       setIsDownloading(true);
+      setDownloadProgress(null);
       setActionError(null);
       const fallbackFileName = `${chapterHeading.replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').trim() || 'chapter'}.cbz`;
 
       if (!isExternalSeries) {
-        await downloadApiFile(`/chapters/${chapterId}/download`, fallbackFileName);
+        await downloadApiFile(`/chapters/${chapterId}/download`, fallbackFileName, setDownloadProgress);
       } else {
-        await downloadChapterAsCbz(chapter, fallbackFileName);
+        await downloadChapterAsCbz(chapter, fallbackFileName, setDownloadProgress);
       }
     } catch (err) {
       setActionError(err?.message || 'Unable to download this chapter.');
     } finally {
       setIsDownloading(false);
+      setDownloadProgress(null);
     }
   };
 
@@ -294,14 +298,19 @@ const ChapterReader = () => {
                 </button>
               )}
               {canDownloadChapter ? (
-                <button
-                  type="button"
-                  className="simple-button simple-button-success w-full sm:w-auto text-center"
-                  onClick={handleChapterDownload}
-                  disabled={isDownloading}
-                >
-                  {isDownloading ? 'Preparing CBZ...' : 'Download CBZ'}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="simple-button simple-button-success w-full sm:w-auto text-center"
+                    onClick={handleChapterDownload}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? 'Preparing CBZ...' : 'Download CBZ'}
+                  </button>
+                  {isDownloading && (
+                    <ProgressBar progress={downloadProgress} />
+                  )}
+                </>
               ) : (
                 <>
                   <button

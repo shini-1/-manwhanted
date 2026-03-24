@@ -7,6 +7,7 @@ import ErrorAlert from '../ErrorAlert';
 import { getStoredHomePath } from '../utils/navigationState';
 import { downloadApiFile, downloadChapterAsCbz, downloadSeriesBatchAsZip } from '../utils/downloads';
 import SmartImage from '../SmartImage';
+import ProgressBar from '../components/ProgressBar';
 
 const normalizeChapters = (value) =>
   Array.isArray(value) ? value.filter((chapter) => chapter && typeof chapter === 'object') : [];
@@ -23,6 +24,7 @@ const SeriesDetail = () => {
   const [actionError, setActionError] = useState(null);
   const [activeDownload, setActiveDownload] = useState('');
   const [activeChapterDownloadId, setActiveChapterDownloadId] = useState('');
+  const [downloadProgress, setDownloadProgress] = useState(null);
   const [chapterPage, setChapterPage] = useState(1);
   const isExternalSeries = Boolean(id?.startsWith('md_'));
 
@@ -56,9 +58,10 @@ const SeriesDetail = () => {
 
     try {
       setActiveDownload(mode);
+      setDownloadProgress(null);
       setActionError(null);
       if (!isExternalSeries) {
-        await downloadApiFile(path, fallbackFileName);
+        await downloadApiFile(path, fallbackFileName, setDownloadProgress);
         return;
       }
 
@@ -74,13 +77,14 @@ const SeriesDetail = () => {
         fullChapters.push(chapterRes.data);
       }
 
-      await downloadSeriesBatchAsZip(series?.title || 'series', fullChapters, fallbackFileName);
+      await downloadSeriesBatchAsZip(series?.title || 'series', fullChapters, fallbackFileName, setDownloadProgress);
     } catch (err) {
       setActionError(
         err?.message || err?.response?.data?.message || 'Unable to download the selected CBZ batch.'
       );
     } finally {
       setActiveDownload('');
+      setDownloadProgress(null);
     }
   };
 
@@ -96,21 +100,24 @@ const SeriesDetail = () => {
 
     try {
       setActiveChapterDownloadId(chapter._id);
+      setDownloadProgress(null);
       setActionError(null);
       if (!isExternalSeries) {
         await downloadApiFile(
           `/chapters/${chapter._id}/download`,
-          `${chapterLabel || 'chapter'}.cbz`
+          `${chapterLabel || 'chapter'}.cbz`,
+          setDownloadProgress
         );
         return;
       }
 
       const chapterRes = await api.get(`/chapters/${chapter._id}`);
-      await downloadChapterAsCbz(chapterRes.data, `${chapterLabel || 'chapter'}.cbz`);
+      await downloadChapterAsCbz(chapterRes.data, `${chapterLabel || 'chapter'}.cbz`, setDownloadProgress);
     } catch (err) {
       setActionError(err?.message || 'Unable to download this chapter.');
     } finally {
       setActiveChapterDownloadId('');
+      setDownloadProgress(null);
     }
   };
 
@@ -211,6 +218,10 @@ const SeriesDetail = () => {
                 </button>
               </>
             )}
+            
+            {activeDownload !== '' && (
+              <ProgressBar progress={downloadProgress} />
+            )}
 
             {resumeChapterId && (
               <button
@@ -281,6 +292,11 @@ const SeriesDetail = () => {
                     >
                       {activeChapterDownloadId === chapter._id ? 'Preparing CBZ...' : 'Download CBZ'}
                     </button>
+                    {activeChapterDownloadId === chapter._id && (
+                      <div className="w-full">
+                        <ProgressBar progress={downloadProgress} />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

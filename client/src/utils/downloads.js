@@ -133,7 +133,7 @@ const buildChapterBaseFileName = (chapter, fallback = 'chapter') => {
   return sanitizeFileName(chapterHeading, fallback);
 };
 
-const buildChapterArchiveBlob = async (chapter) => {
+const buildChapterArchiveBlob = async (chapter, onProgress) => {
   const pageEntries = getChapterPageEntries(chapter);
 
   if (pageEntries.length === 0) {
@@ -146,21 +146,53 @@ const buildChapterArchiveBlob = async (chapter) => {
     const { blob, extension } = await fetchImageBlob(pageEntries[index].candidates);
     const pageNumber = String(index + 1).padStart(3, '0');
     archive.file(`${pageNumber}.${extension}`, blob);
+    
+    if (onProgress) {
+      onProgress({
+        phase: `Fetching page ${index + 1} of ${pageEntries.length}...`,
+        percent: Math.round(((index + 1) / pageEntries.length) * 50)
+      });
+    }
   }
 
   return archive.generateAsync({
     type: 'blob',
     compression: 'DEFLATE',
     compressionOptions: { level: 9 },
+  }, (metadata) => {
+    if (onProgress) {
+      onProgress({
+        phase: `Zipping chapter...`,
+        percent: 50 + Math.round((metadata.percent / 100) * 50),
+      });
+    }
   });
 };
 
-export const downloadApiFile = async (path, fallbackFileName) => {
+export const downloadApiFile = async (path, fallbackFileName, onProgress) => {
   let response;
 
   try {
     response = await api.get(path, {
       responseType: 'blob',
+      onDownloadProgress: (progressEvent) => {
+        if (onProgress) {
+          if (progressEvent.lengthComputable || progressEvent.total) {
+            const total = progressEvent.total || 1;
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / total);
+            onProgress({
+              phase: 'Downloading file...',
+              percent: percentCompleted,
+            });
+          } else {
+            const loadedMb = (progressEvent.loaded / (1024 * 1024)).toFixed(1);
+            onProgress({
+              phase: `Downloading... (${loadedMb} MB)`,
+              percent: 100, // indeterminate style could be inferred by phase presence
+            });
+          }
+        }
+      }
     });
   } catch (error) {
     const responseData = error?.response?.data;
@@ -193,8 +225,8 @@ export const downloadApiFile = async (path, fallbackFileName) => {
   };
 };
 
-export const downloadChapterAsCbz = async (chapter, fallbackFileName) => {
-  const archiveBlob = await buildChapterArchiveBlob(chapter);
+export const downloadChapterAsCbz = async (chapter, fallbackFileName, onProgress) => {
+  const archiveBlob = await buildChapterArchiveBlob(chapter, onProgress);
   const fileName = `${sanitizeFileName(
     fallbackFileName ? fallbackFileName.replace(/\.cbz$/i, '') : buildChapterBaseFileName(chapter),
     'chapter'
@@ -207,7 +239,7 @@ export const downloadChapterAsCbz = async (chapter, fallbackFileName) => {
   };
 };
 
-export const downloadSeriesBatchAsZip = async (seriesTitle, chapters, fallbackFileName) => {
+export const downloadSeriesBatchAsZip = async (seriesTitle, chapters, fallbackFileName, onProgress) => {
   const normalizedChapters = Array.isArray(chapters) ? chapters.filter(Boolean) : [];
 
   if (normalizedChapters.length === 0) {
@@ -216,8 +248,21 @@ export const downloadSeriesBatchAsZip = async (seriesTitle, chapters, fallbackFi
 
   const archive = new JSZip();
 
-  for (const chapter of normalizedChapters) {
-    const chapterBlob = await buildChapterArchiveBlob(chapter);
+  for (let i = 0; i < normalizedChapters.length; i++) {
+    const chapter = normalizedChapters[i];
+    
+    const chapterProgress = (data) => {
+      if (onProgress) {
+        const chapterBasePercent = (i / normalizedChapters.length) * 90;
+        const chapterFraction = 1 / normalizedChapters.length;
+        onProgress({
+          phase: `Chapter ${i + 1}/${normalizedChapters.length}: ${data.phase}`,
+          percent: Math.round(chapterBasePercent + (data.percent / 100) * (chapterFraction * 90))
+        });
+      }
+    };
+
+    const chapterBlob = await buildChapterArchiveBlob(chapter, chapterProgress);
     const chapterFileName = `${buildChapterBaseFileName(chapter)}.cbz`;
     archive.file(chapterFileName, chapterBlob);
   }
@@ -226,6 +271,13 @@ export const downloadSeriesBatchAsZip = async (seriesTitle, chapters, fallbackFi
     type: 'blob',
     compression: 'DEFLATE',
     compressionOptions: { level: 9 },
+  }, (metadata) => {
+    if (onProgress) {
+      onProgress({
+        phase: `Creating final ZIP archive...`,
+        percent: 90 + Math.round((metadata.percent / 100) * 10),
+      });
+    }
   });
   const fileName = `${sanitizeFileName(
     fallbackFileName ? fallbackFileName.replace(/\.zip$/i, '') : seriesTitle,
