@@ -30,7 +30,8 @@ const readSavedOfflineProgress = (fingerprint) => {
 const OfflineReader = () => {
   const fileInputRef = useRef(null);
   const objectUrlsRef = useRef([]);
-  const [pages, setPages] = useState([]);
+  const [chapters, setChapters] = useState([]);
+  const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
   const [fileMeta, setFileMeta] = useState(null);
   const [savedPageIndex, setSavedPageIndex] = useState(0);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -49,7 +50,7 @@ const OfflineReader = () => {
   }, []);
 
   useEffect(() => {
-    if (!fileMeta?.fingerprint || pages.length === 0) {
+    if (!fileMeta?.fingerprint || chapters.length === 0) {
       return;
     }
 
@@ -61,14 +62,15 @@ const OfflineReader = () => {
       `${OFFLINE_PROGRESS_PREFIX}${fileMeta.fingerprint}`,
       JSON.stringify({
         name: fileMeta.name,
+        chapterIndex: currentChapterIndex,
         pageIndex: currentPageIndex,
         updatedAt: Date.now(),
       })
     );
-  }, [currentPageIndex, fileMeta, pages.length]);
+  }, [currentChapterIndex, currentPageIndex, fileMeta, chapters.length]);
 
   useEffect(() => {
-    if (pages.length === 0) {
+    if (chapters.length === 0) {
       return undefined;
     }
 
@@ -113,10 +115,10 @@ const OfflineReader = () => {
     return () => {
       observer.disconnect();
     };
-  }, [pages, savedPageIndex]);
+  }, [chapters, currentChapterIndex, savedPageIndex]);
 
   const processFileOrBlob = async (fileOrBlob, name) => {
-    let extractedPages = [];
+    let chaptersFound = [];
     const archive = await JSZip.loadAsync(fileOrBlob);
 
     const cbzEntries = Object.values(archive.files)
@@ -125,29 +127,37 @@ const OfflineReader = () => {
 
     for (const cbzEntry of cbzEntries) {
       const cbzBlob = await cbzEntry.async('blob');
-      const nestedPages = await processFileOrBlob(cbzBlob, cbzEntry.name);
-      extractedPages = extractedPages.concat(nestedPages);
+      const nestedChapters = await processFileOrBlob(cbzBlob, cbzEntry.name);
+      chaptersFound = chaptersFound.concat(nestedChapters);
     }
 
     const imageEntries = Object.values(archive.files)
       .filter((entry) => !entry.dir && IMAGE_ENTRY_PATTERN.test(entry.name))
       .sort((left, right) => fileNameCollator.compare(left.name, right.name));
 
-    const directPages = await Promise.all(
-      imageEntries.map(async (entry) => {
-        const imageBlob = await entry.async('blob');
-        const objectUrl = URL.createObjectURL(imageBlob);
-        objectUrlsRef.current.push(objectUrl);
+    if (imageEntries.length > 0) {
+      const directPages = await Promise.all(
+        imageEntries.map(async (entry) => {
+          const imageBlob = await entry.async('blob');
+          const objectUrl = URL.createObjectURL(imageBlob);
+          objectUrlsRef.current.push(objectUrl);
 
-        return {
-          id: `${name}:${entry.name}`,
-          label: entry.name,
-          url: objectUrl,
-        };
-      })
-    );
+          return {
+            id: `${name}:${entry.name}`,
+            label: entry.name,
+            url: objectUrl,
+          };
+        })
+      );
+      
+      chaptersFound.push({
+        id: name,
+        label: name,
+        pages: directPages
+      });
+    }
 
-    return extractedPages.concat(directPages);
+    return chaptersFound;
   };
 
   const loadCbzFiles = async (files) => {
@@ -168,7 +178,7 @@ const OfflineReader = () => {
     clearObjectUrls();
 
     try {
-      let allPages = [];
+      let allChapters = [];
       let totalSize = 0;
       let collectiveName = validFiles.length === 1 ? validFiles[0].name : `${validFiles.length} files`;
       let fingerprints = [];
@@ -176,37 +186,47 @@ const OfflineReader = () => {
       for (const file of validFiles) {
         fingerprints.push(createFileFingerprint(file));
         totalSize += file.size || 0;
-        const filePages = await processFileOrBlob(file, file.name);
-        allPages = allPages.concat(filePages);
+        const fileChapters = await processFileOrBlob(file, file.name);
+        allChapters = allChapters.concat(fileChapters);
       }
 
-      if (allPages.length === 0) {
+      if (allChapters.length === 0) {
         throw new Error('These files do not contain readable image pages.');
       }
 
-      const combinedFingerprint = fingerprints.join('|');
-      const savedProgress = readSavedOfflineProgress(combinedFingerprint);
-      const initialPageIndex = Math.min(savedProgress?.pageIndex || 0, allPages.length - 1);
-
-      const finalPages = allPages.map((p, index) => ({
-        ...p,
-        id: `${p.id}:${index}`
+      const mappedChapters = allChapters.map((ch, chIdx) => ({
+        ...ch,
+        id: `${ch.id}:${chIdx}`,
+        pages: ch.pages.map((p, pIdx) => ({
+          ...p,
+          id: `${ch.id}:${chIdx}:${pIdx}`
+        }))
       }));
 
-      setPages(finalPages);
+      const combinedFingerprint = fingerprints.join('|');
+      const savedProgress = readSavedOfflineProgress(combinedFingerprint);
+      const initialChapterIndex = Math.min(savedProgress?.chapterIndex || 0, mappedChapters.length - 1);
+      const initialPageIndex = Math.min(
+        savedProgress?.pageIndex || 0,
+        mappedChapters[initialChapterIndex]?.pages?.length - 1 || 0
+      );
+
+      setChapters(mappedChapters);
       setFileMeta({
         fingerprint: combinedFingerprint,
         name: collectiveName,
-        pageCount: finalPages.length,
+        chapterCount: mappedChapters.length,
         size: totalSize,
       });
+      setCurrentChapterIndex(initialChapterIndex);
       setSavedPageIndex(initialPageIndex);
       setCurrentPageIndex(initialPageIndex);
     } catch (loadError) {
       console.error('Offline files load error:', loadError);
       clearObjectUrls();
-      setPages([]);
+      setChapters([]);
       setFileMeta(null);
+      setCurrentChapterIndex(0);
       setSavedPageIndex(0);
       setCurrentPageIndex(0);
       setError(loadError.message || 'Failed to open the provided file(s).');
@@ -293,7 +313,7 @@ const OfflineReader = () => {
             <div>
               <p className="font-semibold text-slate-50">{fileMeta.name}</p>
               <p className="text-slate-400">
-                {fileMeta.pageCount} pages · Currently on page {currentPageIndex + 1}
+                Chapter {currentChapterIndex + 1} of {fileMeta.chapterCount} · {chapters[currentChapterIndex]?.pages?.length} pages · Currently on page {currentPageIndex + 1}
               </p>
             </div>
             {savedPageIndex > 0 && (
@@ -305,9 +325,12 @@ const OfflineReader = () => {
         </section>
       )}
 
-      {pages.length > 0 && !loading && (
+      {chapters.length > 0 && !loading && (
         <div className="space-y-4">
-          {pages.map((page, index) => (
+          <h2 className="text-center font-bold text-xl text-slate-100 mb-6 mt-4">
+            {chapters[currentChapterIndex]?.label?.replace(/\.cbz$/i, '') || `Chapter ${currentChapterIndex + 1}`}
+          </h2>
+          {chapters[currentChapterIndex]?.pages.map((page, index) => (
             <div
               key={page.id}
               data-offline-page-index={index}
@@ -322,6 +345,37 @@ const OfflineReader = () => {
               />
             </div>
           ))}
+          
+          {chapters.length > 1 && (
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                className={`simple-button ${currentChapterIndex > 0 ? '' : 'simple-button-disabled'}`}
+                disabled={currentChapterIndex <= 0}
+                onClick={() => {
+                  setCurrentChapterIndex(c => Math.max(0, c - 1));
+                  setSavedPageIndex(0);
+                  setCurrentPageIndex(0);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              >
+                Previous Chapter
+              </button>
+              <button
+                type="button"
+                className={`simple-button ${currentChapterIndex < chapters.length - 1 ? 'simple-button-primary' : 'simple-button-disabled'}`}
+                disabled={currentChapterIndex >= chapters.length - 1}
+                onClick={() => {
+                  setCurrentChapterIndex(c => Math.min(chapters.length - 1, c + 1));
+                  setSavedPageIndex(0);
+                  setCurrentPageIndex(0);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              >
+                Next Chapter
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
