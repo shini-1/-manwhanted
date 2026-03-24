@@ -23,7 +23,7 @@ const SeriesDetail = () => {
   const [loadError, setLoadError] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [activeDownload, setActiveDownload] = useState('');
-  const [activeChapterDownloadId, setActiveChapterDownloadId] = useState('');
+  const [chapterDownloads, setChapterDownloads] = useState({});
   const [downloadProgress, setDownloadProgress] = useState(null);
   const [chapterPage, setChapterPage] = useState(1);
   const isExternalSeries = Boolean(id?.startsWith('md_'));
@@ -99,25 +99,38 @@ const SeriesDetail = () => {
       .trim();
 
     try {
-      setActiveChapterDownloadId(chapter._id);
-      setDownloadProgress(null);
+      setChapterDownloads((prev) => ({
+        ...prev,
+        [chapter._id]: { status: 'downloading', progress: null },
+      }));
       setActionError(null);
+
+      const onProgress = (progress) => {
+        setChapterDownloads((prev) => ({
+          ...prev,
+          [chapter._id]: { status: 'downloading', progress },
+        }));
+      };
+
       if (!isExternalSeries) {
         await downloadApiFile(
           `/chapters/${chapter._id}/download`,
           `${chapterLabel || 'chapter'}.cbz`,
-          setDownloadProgress
+          onProgress
         );
         return;
       }
 
       const chapterRes = await api.get(`/chapters/${chapter._id}`);
-      await downloadChapterAsCbz(chapterRes.data, `${chapterLabel || 'chapter'}.cbz`, setDownloadProgress);
+      await downloadChapterAsCbz(chapterRes.data, `${chapterLabel || 'chapter'}.cbz`, onProgress);
     } catch (err) {
       setActionError(err?.message || 'Unable to download this chapter.');
     } finally {
-      setActiveChapterDownloadId('');
-      setDownloadProgress(null);
+      setChapterDownloads((prev) => {
+        const next = { ...prev };
+        delete next[chapter._id];
+        return next;
+      });
     }
   };
 
@@ -288,13 +301,13 @@ const SeriesDetail = () => {
                       type="button"
                       className="simple-button simple-button-success flex-1 sm:flex-none"
                       onClick={() => handleChapterDownload(chapter)}
-                      disabled={activeChapterDownloadId !== '' && activeChapterDownloadId !== chapter._id}
+                      disabled={chapterDownloads[chapter._id]?.status === 'downloading'}
                     >
-                      {activeChapterDownloadId === chapter._id ? 'Preparing CBZ...' : 'Download CBZ'}
+                      {chapterDownloads[chapter._id]?.status === 'downloading' ? 'Preparing CBZ...' : 'Download CBZ'}
                     </button>
-                    {activeChapterDownloadId === chapter._id && (
+                    {chapterDownloads[chapter._id]?.status === 'downloading' && (
                       <div className="w-full">
-                        <ProgressBar progress={downloadProgress} />
+                        <ProgressBar progress={chapterDownloads[chapter._id]?.progress} />
                       </div>
                     )}
                   </div>
